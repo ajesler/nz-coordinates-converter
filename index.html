@@ -97,7 +97,7 @@
 
     .input-row { display: flex; gap: .5rem; }
 
-    .input-wrapper { position: relative; flex: 1; min-width: 0; }
+    .input-wrapper { position: relative; width: 100%; min-width: 0; }
 
     .coord-input {
       width: 100%;
@@ -129,19 +129,6 @@
     }
     .btn-clear:hover { color: var(--text); }
 
-    .btn-secondary {
-      padding: .625rem 1rem;
-      background: transparent;
-      color: var(--blue);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: .875rem;
-      font-weight: 500;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background .15s, border-color .15s;
-    }
-    .btn-secondary:hover { background: var(--bg); border-color: var(--blue); }
 
     .examples {
       margin-top: .75rem;
@@ -1534,7 +1521,6 @@ class App {
               >
               <button class="btn-clear" id="clear-btn" aria-label="Clear input">✕</button>
             </div>
-            <button class="btn-secondary" id="convert-btn">Convert</button>
           </div>
           <div class="examples">
             Examples:
@@ -1560,7 +1546,7 @@ class App {
       debounceTimer = setTimeout(() => this._convert(), 400);
     };
 
-    document.getElementById('convert-btn').addEventListener('click', () => this._convert());
+    document.getElementById('convert-btn')?.addEventListener('click', () => this._convert());
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter') { clearTimeout(debounceTimer); this._convert(); }
     });
