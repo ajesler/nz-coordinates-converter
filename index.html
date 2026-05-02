@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NZ Map Coordinates Converter</title>
+  <meta name="description" content="Convert between NZ map coordinates in different formats: Google Maps, NZ Topo, lat/lng, geo URI, NZTM2000 easting/northing, NZ topo sheets">
+
+  <!-- PWA / home-screen support -->
+  <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="NZ Map Converter">
+  <!-- Manifest injected via JS below as a data URI (keeps single-file) -->
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:       #2563eb;
+      --blue-dark:  #1d4ed8;
+      --green:      #16a34a;
+      --green-bg:   #dcfce7;
+      --green-text: #15803d;
+      --red:        #dc2626;
+      --red-bg:     #fef2f2;
+      --red-text:   #b91c1c;
+      --bg:         #f1f5f9;
+      --card:       #ffffff;
+      --text:       #0f172a;
+      --muted:      #64748b;
+      --border:     #e2e8f0;
+      --radius:     8px;
+      --shadow:     0 1px 3px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06);
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    .app-header {
+      background: var(--blue);
+      color: white;
+      padding: .875rem 1.5rem;
+    }
+    .app-header h1 { font-size: 1.2rem; font-weight: 600; letter-spacing: -.01em; }
+    .app-header.test-header { background: #1e293b; }
+
+    /* ── Layout ── */
+    .container { max-width: 820px; margin: 0 auto; padding: 1.5rem 1rem; }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Input ── */
+    .input-label { display: block; font-weight: 500; margin-bottom: .5rem; }
+
+    .input-row { display: flex; gap: .5rem; }
+
+    .coord-input {
+      flex: 1;
+      min-width: 0;
+      padding: .625rem .875rem;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      font-size: 1rem;
+      font-family: var(--mono);
+      color: var(--text);
+      outline: none;
+      transition: border-color .15s;
+    }
+    .coord-input:focus { border-color: var(--blue); }
+
+    .btn-primary {
+      padding: .625rem 1.25rem;
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s;
+    }
+    .btn-primary:hover { background: var(--blue-dark); }
+
+    .examples {
+      margin-top: .75rem;
+      font-size: .8125rem;
+      color: var(--muted);
+    }
+    .examples a {
+      color: var(--blue);
+      cursor: pointer;
+      text-decoration: none;
+      margin: 0 .125rem;
+    }
+    .examples a:hover { text-decoration: underline; }
+
+    /* ── Results ── */
+    .detected-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .375rem;
+      background: var(--green-bg);
+      color: var(--green-text);
+      padding: .25rem .75rem;
+      border-radius: 9999px;
+      font-size: .875rem;
+      font-weight: 500;
+      margin-bottom: .625rem;
+    }
+
+    .coords-info {
+      font-size: .8125rem;
+      color: var(--muted);
+      font-family: var(--mono);
+      margin-bottom: 1.25rem;
+    }
+
+    .results-heading {
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--muted);
+      margin-bottom: .625rem;
+    }
+
+    .result-list { list-style: none; }
+
+    .result-item {
+      display: grid;
+      grid-template-columns: 175px 1fr auto;
+      align-items: center;
+      gap: .75rem;
+      padding: .75rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .result-item:first-child { border-top: none; }
+
+    .result-service { font-size: .8125rem; font-weight: 500; color: var(--muted); }
+
+    .result-value {
+      font-size: .875rem;
+      word-break: break-all;
+      min-width: 0;
+      font-family: var(--mono);
+    }
+    .result-value a { color: var(--blue); text-decoration: none; }
+    .result-value a:hover { text-decoration: underline; }
+
+    .btn-copy {
+      padding: .25rem .625rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: .75rem;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .1s, color .1s, border-color .1s;
+      flex-shrink: 0;
+    }
+    .btn-copy:hover { background: var(--bg); color: var(--text); }
+    .btn-copy.copied {
+      background: var(--green-bg);
+      color: var(--green-text);
+      border-color: var(--green);
+    }
+
+    .error-box {
+      background: var(--red-bg);
+      border: 1px solid #fecaca;
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      color: var(--red-text);
+      font-size: .9375rem;
+    }
+
+    /* ── Tests ── */
+    .test-summary {
+      padding: .875rem 1.25rem;
+      border-radius: var(--radius);
+      font-weight: 600;
+      font-size: .9375rem;
+      margin-bottom: 1.25rem;
+    }
+    .test-summary.pass { background: var(--green-bg); color: var(--green-text); }
+    .test-summary.fail { background: var(--red-bg); color: var(--red-text); }
+
+    .test-suite { margin-bottom: 1.25rem; }
+    .test-suite-name {
+      font-weight: 600;
+      font-size: .95rem;
+      margin-bottom: .5rem;
+      padding-bottom: .375rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .test-item {
+      display: flex;
+      align-items: baseline;
+      gap: .5rem;
+      padding: .375rem .75rem;
+      border-radius: 4px;
+      margin: 2px 0;
+      font-size: .875rem;
+    }
+    .test-item.pass { background: #f0fdf4; color: var(--green-text); }
+    .test-item.fail { background: var(--red-bg); color: var(--red-text); }
+    .test-item .detail { font-size: .75rem; opacity: .8; font-family: var(--mono); }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .input-row { flex-direction: column; }
+      .btn-primary { width: 100%; }
+      .result-item { grid-template-columns: 1fr auto; }
+      .result-service { grid-column: 1 / -1; color: var(--text); }
+      .result-value { grid-column: 1; }
+    }
+    @media (max-width: 400px) {
+      .card { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Utility helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function nearEqual(a, b, tol = 1e-6) {
+  return Math.abs(a - b) <= tol;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Coordinates — internal lat/lng/zoom representation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class Coordinates {
+  constructor(lat, lng, zoom = null) {
+    this.lat  = parseFloat(lat);
+    this.lng  = parseFloat(lng);
+    this.zoom = (zoom !== null && zoom !== undefined) ? parseFloat(zoom) : null;
+  }
+
+  toString() {
+    const z = this.zoom !== null ? `, zoom ${this.zoom}` : '';
+    return `${this.lat.toFixed(6)}, ${this.lng.toFixed(6)}${z}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NZTM2000 Projection  (EPSG:2193)
+// Transverse Mercator on GRS80 ellipsoid
+// Parameters from LINZ ICSM publication
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class NZTM2000 {
+  constructor() {
+    this.a   = 6378137.0;           // GRS80 semi-major axis (m)
+    this.f   = 1 / 298.257222101;   // GRS80 flattening
+    this.e2  = 2 * this.f - this.f * this.f;           // eccentricity²
+    this.ep2 = this.e2 / (1 - this.e2);                // second eccentricity²
+    this.k0  = 0.9996;              // scale factor at CM
+    this.lon0 = 173 * Math.PI / 180; // central meridian 173°E
+    this.lat0 = 0;                  // latitude of origin
+    this.E0  = 1600000;             // false easting (m)
+    this.N0  = 10000000;            // false northing (m)
+  }
+
+  // Meridional arc distance from equator to latitude phi
+  _M(phi) {
+    const { a, e2 } = this;
+    const e4 = e2 * e2, e6 = e4 * e2;
+    return a * (
+        (1 - e2/4 - 3*e4/64 - 5*e6/256)    * phi
+      - (3*e2/8 + 3*e4/32 + 45*e6/1024)    * Math.sin(2 * phi)
+      + (15*e4/256 + 45*e6/1024)            * Math.sin(4 * phi)
+      - (35*e6/3072)                        * Math.sin(6 * phi)
+    );
+  }
+
+  // Geographic (degrees WGS84/GRS80) → NZTM2000 easting / northing (metres)
+  toNZTM(lat, lng) {
+    const phi  = lat * Math.PI / 180;
+    const lam  = lng * Math.PI / 180;
+    const dlam = lam - this.lon0;
+    const { a, e2, ep2, k0, E0, N0, lat0 } = this;
+
+    const sp = Math.sin(phi), cp = Math.cos(phi), tp = Math.tan(phi);
+    const Nrad = a / Math.sqrt(1 - e2 * sp * sp);   // radius of curvature in prime vertical
+    const T  = tp * tp;
+    const C  = ep2 * cp * cp;
+    const A  = cp * dlam;
+    const M  = this._M(phi);
+    const M0 = this._M(lat0);
+
+    const A2=A*A, A3=A2*A, A4=A3*A, A5=A4*A, A6=A5*A;
+
+    const E = E0 + k0 * Nrad * (
+        A
+      + (1 - T + C) * A3 / 6
+      + (5 - 18*T + T*T + 72*C - 58*ep2) * A5 / 120
+    );
+
+    const Nval = N0 + k0 * (
+        M - M0
+      + Nrad * tp * (
+            A2 / 2
+          + (5 - T + 9*C + 4*C*C) * A4 / 24
+          + (61 - 58*T + T*T + 600*C - 330*ep2) * A6 / 720
+        )
+    );
+
+    return { E: Math.round(E), N: Math.round(Nval) };
+  }
+
+  // NZTM2000 easting / northing (metres) → geographic (degrees WGS84/GRS80)
+  fromNZTM(E, N) {
+    const { a, e2, ep2, k0, lon0, lat0, E0, N0 } = this;
+    const e4 = e2*e2, e6 = e4*e2;
+    const M0 = this._M(lat0);
+
+    // Footprint latitude via Bowring's series
+    const e1  = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+    const M   = (N - N0) / k0 + M0;
+    const mu  = M / (a * (1 - e2/4 - 3*e4/64 - 5*e6/256));
+
+    const phi1 = mu
+      + (3*e1/2   - 27*e1**3/32)    * Math.sin(2*mu)
+      + (21*e1**2/16 - 55*e1**4/32) * Math.sin(4*mu)
+      + (151*e1**3/96)               * Math.sin(6*mu)
+      + (1097*e1**4/512)             * Math.sin(8*mu);
+
+    const sp1 = Math.sin(phi1), cp1 = Math.cos(phi1), tp1 = Math.tan(phi1);
+    const N1 = a / Math.sqrt(1 - e2 * sp1 * sp1);
+    const T1 = tp1 * tp1;
+    const C1 = ep2 * cp1 * cp1;
+    const R1 = a * (1 - e2) / Math.pow(1 - e2 * sp1*sp1, 1.5);
+    const D  = (E - E0) / (N1 * k0);
+
+    const D2=D*D, D3=D2*D, D4=D3*D, D5=D4*D, D6=D5*D;
+
+    const phi = phi1 - (N1 * tp1 / R1) * (
+        D2 / 2
+      - (5 + 3*T1 + 10*C1 - 4*C1*C1 - 9*ep2)  * D4 / 24
+      + (61 + 90*T1 + 298*C1 + 45*T1*T1 - 252*ep2 - 3*C1*C1) * D6 / 720
+    );
+
+    const lam = lon0 + (
+        D
+      - (1 + 2*T1 + C1)                                            * D3 / 6
+      + (5 - 2*C1 + 28*T1 - 3*C1*C1 + 8*ep2 + 24*T1*T1) * D5 / 120
+    ) / cp1;
+
+    return { lat: phi * 180 / Math.PI, lng: lam * 180 / Math.PI };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NZ Topo50 Map Sheet — sheet code calculator
+// Algorithm ported from https://github.com/linz/argo-tasks/blob/master/src/utils/mapsheet.ts
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class MapSheet {
+  /** Top-left NZTM2000 origin of the entire sheet grid */
+  static get origin()  { return { x: 988000, y: 6234000 }; }
+  static get width()   { return 24000; }
+  static get height()  { return 36000; }
+
+  /**
+   * Calculate the NZTM2000 top-left origin for a Topo50 sheet code.
+   * @param {string} sheetCode  e.g. "BF35"
+   * @returns {{ x: number, y: number }}
+   */
+  static offset(sheetCode) {
+    const ms = sheetCode.slice(0, 2).toUpperCase();
+    const x  = Number(sheetCode.slice(2));
+
+    const charA = 'A'.charCodeAt(0);
+    const baseYOffset = 'S'.charCodeAt(0) - charA;   // 18 — sheets start at "AS"
+    const firstLetterOffset  = (ms.charCodeAt(0) - charA) * 26;
+    const secondLetterOffset = ms.charCodeAt(1) - charA;
+
+    let y = firstLetterOffset + secondLetterOffset - baseYOffset;
+
+    // Three sheet codes don't exist: BI, BO, CI — adjust row index accordingly
+    if      (ms > 'CI') y -= 3;
+    else if (ms > 'BO') y -= 2;
+    else if (ms > 'BI') y -= 1;
+
+    return {
+      x: MapSheet.width  * x + MapSheet.origin.x,
+      y: MapSheet.origin.y - MapSheet.height * y,
+    };
+  }
+
+  /**
+   * Calculate the Topo50 sheet code for a NZTM2000 x/y point.
+   * @param {number} x  NZTM2000 Easting
+   * @param {number} y  NZTM2000 Northing
+   * @returns {string}  e.g. "BF35"
+   */
+  static sheetCode(x, y) {
+    const charA = 'A'.charCodeAt(0);
+
+    const offsetX = Math.floor((x - MapSheet.origin.x) / MapSheet.width);
+    const offsetY = Math.floor((MapSheet.origin.y - y) / MapSheet.height);
+
+    let charYOffset = offsetY;
+    if (charYOffset >= 16) charYOffset++;  // BI gap
+    if (charYOffset >= 22) charYOffset++;  // BO gap
+    if (charYOffset >= 42) charYOffset++;  // CI gap
+
+    const baseYOffset = 'S'.charCodeAt(0) - charA;   // 18
+    charYOffset += baseYOffset;
+
+    const firstLetter  = String.fromCharCode(Math.floor(charYOffset / 26) + charA);
+    const secondLetter = String.fromCharCode((charYOffset % 26) + charA);
+    return `${firstLetter}${secondLetter}${String(offsetX).padStart(2, '0')}`;
+  }
+
+  /**
+   * Return true if the sheet code falls within LINZ's known valid ranges.
+   * @param {string} sheet  e.g. "BF35"
+   */
+  static isKnown(sheet) {
+    const key   = sheet.slice(0, 2).toUpperCase();
+    const index = Number(sheet.slice(2, 4));
+    if (Number.isNaN(index)) return false;
+    const ranges = MapSheet.sheetRanges[key];
+    if (!ranges) return false;
+    for (const [low, high] of ranges) {
+      if (low <= index && index <= high) return true;
+    }
+    return false;
+  }
+
+  /** Valid sheet column ranges per row (from LINZ argo-tasks SheetRanges) */
+  static get sheetRanges() {
+    return {
+      AS: [[21,22],[24,24]],  AT: [[23,26]],          AU: [[24,29]],
+      AV: [[24,30]],          AW: [[25,32]],          AX: [[27,33]],
+      AY: [[28,35]],          AZ: [[28,36]],          BA: [[29,37]],
+      BB: [[30,37]],          BC: [[30,38],[40,41]],  BD: [[31,46]],
+      BE: [[31,46]],          BF: [[30,45]],          BG: [[29,45]],
+      BH: [[28,44]],          BJ: [[27,43]],          BK: [[28,40]],
+      BL: [[28,40]],          BM: [[23,25],[32,39]],  BN: [[22,29],[32,38]],
+      BP: [[22,37]],          BQ: [[21,36]],          BR: [[19,30],[32,34]],
+      BS: [[19,29]],          BT: [[18,28]],          BU: [[16,27]],
+      BV: [[15,27]],          BW: [[14,26]],          BX: [[12,26]],
+      BY: [[10,26]],          BZ: [[ 8,23]],          CA: [[ 7,22]],
+      CB: [[ 6,20]],          CC: [[ 5,20]],          CD: [[ 4,19]],
+      CE: [[ 4,18]],          CF: [[ 4,17]],          CG: [[ 4,16]],
+      CH: [[ 5,14]],          CJ: [[ 7,11]],          CK: [[ 7, 9]],
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Base MapService class
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class MapService {
+  /** Human-readable name shown in the UI */
+  get name() { throw new Error('name not implemented'); }
+
+  /** True when generate() returns an http(s)/geo URL */
+  get isURL() { return false; }
+
+  /** Returns true if this service can attempt to parse the given string */
+  canParse(input) { throw new Error('canParse not implemented'); }
+
+  /** Parse input → Coordinates (or null on failure) */
+  parse(input) { throw new Error('parse not implemented'); }
+
+  /** Coordinates → canonical string / URL for this service */
+  generate(coords) { throw new Error('generate not implemented'); }
+
+  /** Array of { name, run(), expected } test cases */
+  getTests() { return []; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Google Maps
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class GoogleMapsService extends MapService {
+  get name()  { return 'Google Maps'; }
+  get isURL() { return true; }
+
+  canParse(input) {
+    return /https?:\/\/(www\.|maps\.)?google\.[a-z.]{2,6}\/maps/i.test(input);
+  }
+
+  parse(input) {
+    // /@lat,lng,{N}z  or  /@lat,lng,{N}m
+    const atM = input.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*),([\d.]+)([mz])/i);
+    if (atM) {
+      const lat = parseFloat(atM[1]);
+      const lng = parseFloat(atM[2]);
+      const val = parseFloat(atM[3]);
+      let zoom;
+      if (atM[4].toLowerCase() === 'z') {
+        zoom = val;
+      } else {
+        // metres → approximate zoom using Web Mercator ground resolution
+        const res = Math.cos(lat * Math.PI / 180) * 40075016.686 / val;
+        zoom = Math.max(1, Math.min(21, Math.round(Math.log2(res))));
+      }
+      return new Coordinates(lat, lng, zoom);
+    }
+    // query=lat,lng  or  query=lat%2Clng
+    const qM = input.match(/[?&]query=(-?\d+\.?\d*)[,%2C]+(-?\d+\.?\d*)/i);
+    if (qM) return new Coordinates(parseFloat(qM[1]), parseFloat(qM[2]));
+    // ?q=lat,lng
+    const q2 = input.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (q2) return new Coordinates(parseFloat(q2[1]), parseFloat(q2[2]));
+
+    return null;
+  }
+
+  generate(coords) {
+    return `https://www.google.com/maps/search/?api=1&query=${coords.lat}%2C${coords.lng}`;
+  }
+
+  getTests() {
+    const svc = new GoogleMapsService();
+    return [
+      {
+        name: 'Detect Google Maps URL',
+        run: () => svc.canParse('https://www.google.com/maps/@-41.1532071,174.8267152,67m'),
+        expected: true
+      },
+      {
+        name: 'Does not match NZ Topo URL',
+        run: () => svc.canParse('https://www.topomap.co.nz/NZTopoMap?v=2&ll=-42.688366,171.88179&z=12'),
+        expected: false
+      },
+      {
+        name: 'Parse @lat,lng,Nm format',
+        run: () => {
+          const c = svc.parse('https://www.google.com/maps/@-41.1532071,174.8267152,67m');
+          return nearEqual(c.lat, -41.1532071) && nearEqual(c.lng, 174.8267152);
+        },
+        expected: true
+      },
+      {
+        name: 'Parse @lat,lng,Zz format',
+        run: () => {
+          const c = svc.parse('https://www.google.com/maps/@-41.2865,174.7762,15z');
+          return nearEqual(c.lat, -41.2865) && nearEqual(c.lng, 174.7762) && c.zoom === 15;
+        },
+        expected: true
+      },
+      {
+        name: 'Parse @lat,lng,decimal-z format (e.g. 16.24z)',
+        run: () => {
+          const c = svc.parse('https://google.com/maps/@-41.2191,174.7133584,16.24z');
+          return nearEqual(c.lat, -41.2191) && nearEqual(c.lng, 174.7133584);
+        },
+        expected: true
+      },
+      {
+        name: 'Detect Google Maps search URL',
+        run: () => svc.canParse('https://www.google.com/maps/search/?api=1&query=47.5951518%2C-122.3316393'),
+        expected: true
+      },
+      {
+        name: 'Parse search URL query=lat%2Clng',
+        run: () => {
+          const c = svc.parse('https://www.google.com/maps/search/?api=1&query=-41.2865%2C174.7762');
+          return nearEqual(c.lat, -41.2865) && nearEqual(c.lng, 174.7762);
+        },
+        expected: true
+      },
+      {
+        name: 'Generate produces search URL with marker',
+        run: () => {
+          const url = svc.generate(new Coordinates(-41.2865, 174.7762));
+          return url.startsWith('https://www.google.com/maps/search/?api=1&query=');
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip: lat/lng preserved within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-37.787, 175.279);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      }
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NZ Topo Map  (topomap.co.nz)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class NZTopoService extends MapService {
+  get name()  { return 'NZ Topo Map'; }
+  get isURL() { return true; }
+
+  canParse(input) {
+    return /topomap\.co\.nz/i.test(input);
+  }
+
+  parse(input) {
+    const ll = input.match(/ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (!ll) return null;
+    const zM = input.match(/[?&]z=(\d+)/);
+    return new Coordinates(
+      parseFloat(ll[1]),
+      parseFloat(ll[2]),
+      zM ? parseInt(zM[1]) : null
+    );
+  }
+
+  generate(coords) {
+    const z = Math.round(coords.zoom ?? 13);
+    return `https://www.topomap.co.nz/NZTopoMap?v=2&ll=${coords.lat},${coords.lng}&z=${z}&pin=1`;
+  }
+
+  getTests() {
+    const svc = new NZTopoService();
+    return [
+      {
+        name: 'Detect NZ Topo URL',
+        run: () => svc.canParse('https://www.topomap.co.nz/NZTopoMap?v=2&ll=-42.688366,171.88179&z=12'),
+        expected: true
+      },
+      {
+        name: 'Does not match Google Maps URL',
+        run: () => svc.canParse('https://www.google.com/maps/@-41.2865,174.7762,15z'),
+        expected: false
+      },
+      {
+        name: 'Parse lat, lng and zoom',
+        run: () => {
+          const c = svc.parse('https://www.topomap.co.nz/NZTopoMap?v=2&ll=-42.688366,171.88179&z=12');
+          return nearEqual(c.lat, -42.688366) && nearEqual(c.lng, 171.88179) && c.zoom === 12;
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip: lat/lng/zoom preserved exactly',
+        run: () => {
+          const orig = new Coordinates(-43.5321, 172.6362, 14);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat) && nearEqual(back.lng, orig.lng) && back.zoom === orig.zoom;
+        },
+        expected: true
+      }
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Decimal Lat/Lng pair
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class LatLngService extends MapService {
+  get name()  { return 'Decimal Lat/Lng'; }
+  get isURL() { return false; }
+
+  canParse(input) {
+    return /^-?\d{1,3}(?:\.\d+)?\s*,\s*-?\d{1,3}(?:\.\d+)?\s*$/.test(input.trim());
+  }
+
+  parse(input) {
+    const m = input.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+    if (!m) return null;
+    return new Coordinates(parseFloat(m[1]), parseFloat(m[2]));
+  }
+
+  generate(coords) {
+    return `${coords.lat},${coords.lng}`;
+  }
+
+  getTests() {
+    const svc = new LatLngService();
+    return [
+      {
+        name: 'Detect decimal lat/lng',
+        run: () => svc.canParse('-37.4936876,175.1932621'),
+        expected: true
+      },
+      {
+        name: 'Detect with spaces around comma',
+        run: () => svc.canParse('-37.4936876, 175.1932621'),
+        expected: true
+      },
+      {
+        name: 'Does not match URL',
+        run: () => svc.canParse('https://www.google.com/maps/@-41.28,174.78,15z'),
+        expected: false
+      },
+      {
+        name: 'Parse lat and lng correctly',
+        run: () => {
+          const c = svc.parse('-37.4936876,175.1932621');
+          return nearEqual(c.lat, -37.4936876) && nearEqual(c.lng, 175.1932621);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip: lat/lng preserved exactly',
+        run: () => {
+          const orig = new Coordinates(-41.2865, 174.7762);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat) && nearEqual(back.lng, orig.lng);
+        },
+        expected: true
+      }
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Geo URI  (RFC 5870)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class GeoURIService extends MapService {
+  get name()  { return 'Geo URI'; }
+  get isURL() { return true; }
+
+  canParse(input) {
+    return /^geo:/i.test(input.trim());
+  }
+
+  parse(input) {
+    // geo:lat,lng[,alt][?params]
+    const m = input.trim().match(
+      /^geo:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)(?:,[\d.]+)?(?:\?(.*))?/i
+    );
+    if (!m) return null;
+    const lat  = parseFloat(m[1]);
+    const lng  = parseFloat(m[2]);
+    let   zoom = null;
+    if (m[3]) {
+      const zM = m[3].match(/\bz=(\d+)/i);
+      if (zM) zoom = parseInt(zM[1]);
+    }
+    return new Coordinates(lat, lng, zoom);
+  }
+
+  generate(coords) {
+    const z = Math.round(coords.zoom ?? 14);
+    return `geo:${coords.lat},${coords.lng}?z=${z}`;
+  }
+
+  getTests() {
+    const svc = new GeoURIService();
+    return [
+      {
+        name: 'Detect geo: URI',
+        run: () => svc.canParse('geo:37.78918,-122.40335?z=14&(Wikimedia+Foundation)'),
+        expected: true
+      },
+      {
+        name: 'Does not match decimal lat/lng',
+        run: () => svc.canParse('-41.2865,174.7762'),
+        expected: false
+      },
+      {
+        name: 'Parse lat, lng and zoom',
+        run: () => {
+          const c = svc.parse('geo:37.78918,-122.40335?z=14&(Wikimedia+Foundation)');
+          return nearEqual(c.lat, 37.78918) && nearEqual(c.lng, -122.40335) && c.zoom === 14;
+        },
+        expected: true
+      },
+      {
+        name: 'Parse geo URI without zoom',
+        run: () => {
+          const c = svc.parse('geo:-41.2865,174.7762');
+          return nearEqual(c.lat, -41.2865) && nearEqual(c.lng, 174.7762) && c.zoom === null;
+        },
+        expected: true
+      },
+      {
+        name: 'Parse geo URI with altitude component',
+        run: () => {
+          const c = svc.parse('geo:-36.848461,174.763336,10?z=15');
+          return nearEqual(c.lat, -36.848461) && nearEqual(c.lng, 174.763336) && c.zoom === 15;
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip: lat/lng/zoom preserved exactly',
+        run: () => {
+          const orig = new Coordinates(-37.787, 175.279, 13);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat) && nearEqual(back.lng, orig.lng) && back.zoom === orig.zoom;
+        },
+        expected: true
+      }
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NZ Easting / Northing  (NZTM2000, EPSG:2193)
+// Format: "E 1845100 N 5743800"
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class NZEastingNorthingService extends MapService {
+  constructor() {
+    super();
+    this._proj = new NZTM2000();
+  }
+
+  get name()  { return 'NZ Easting/Northing'; }
+  get isURL() { return false; }
+
+  canParse(input) {
+    return /^E\s*\d{6,8}\s+N\s*\d{6,8}\s*$/i.test(input.trim());
+  }
+
+  parse(input) {
+    const m = input.trim().match(/E\s*(\d+)\s+N\s*(\d+)/i);
+    if (!m) return null;
+    const { lat, lng } = this._proj.fromNZTM(parseInt(m[1]), parseInt(m[2]));
+    return new Coordinates(lat, lng);
+  }
+
+  generate(coords) {
+    const { E, N } = this._proj.toNZTM(coords.lat, coords.lng);
+    return `E ${E} N ${N}`;
+  }
+
+  getTests() {
+    const svc = new NZEastingNorthingService();
+    return [
+      {
+        name: 'Detect E/N format',
+        run: () => svc.canParse('E 1845100 N 5743800'),
+        expected: true
+      },
+      {
+        name: 'Does not match decimal lat/lng',
+        run: () => svc.canParse('-41.2865,174.7762'),
+        expected: false
+      },
+      {
+        name: 'Known value falls within NZ bounds',
+        run: () => {
+          const c = svc.parse('E 1845100 N 5743800');
+          return c.lat > -48 && c.lat < -34 && c.lng > 165 && c.lng < 179;
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip Wellington within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-41.2865, 174.7762);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip Auckland within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-36.8485, 174.7633);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip Christchurch within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-43.5321, 172.6362);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip Invercargill (southern extreme) within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-46.4132, 168.3538);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Forward: Wellington E ≈ 1746000–1752000, N ≈ 5424000–5432000',
+        run: () => {
+          const { E, N } = new NZTM2000().toNZTM(-41.2865, 174.7762);
+          return E > 1746000 && E < 1752000 && N > 5424000 && N < 5432000;
+        },
+        expected: true
+      }
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NZ Topo50 Sheet Code
+// Format: "BF35 451 438" — sheet code + 3-digit easting ref + 3-digit northing ref
+//   Each digit unit = 100 m (last 3 digits of NZTM coord ÷ 100)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class NZTopoSheetService extends MapService {
+  constructor() {
+    super();
+    this._proj = new NZTM2000();
+  }
+
+  get name()  { return 'NZ Topo50 Sheet'; }
+  get isURL() { return false; }
+
+  canParse(input) {
+    return /^[A-Z]{2}\d{2}\s+\d{3}\s+\d{3}$/i.test(input.trim());
+  }
+
+  parse(input) {
+    const m = input.trim().match(/^([A-Z]{2}\d{2})\s+(\d{3})\s+(\d{3})$/i);
+    if (!m) return null;
+
+    const code = m[1].toUpperCase();
+    const refE  = parseInt(m[2], 10);
+    const refN  = parseInt(m[3], 10);
+
+    // Get top-left (NW) corner of the sheet, then derive SW corner
+    const origin = MapSheet.offset(code);
+    const swX    = origin.x;
+    const swY    = origin.y - MapSheet.height;
+
+    // Reconstruct full NZTM coordinates from 100 m grid references
+    let E = Math.floor(swX / 100000) * 100000 + refE * 100;
+    if (E < swX) E += 100000;   // handle 100 km grid boundary crossing
+
+    let N = Math.floor(swY / 100000) * 100000 + refN * 100;
+    if (N < swY) N += 100000;
+
+    const { lat, lng } = this._proj.fromNZTM(E, N);
+    return new Coordinates(lat, lng);
+  }
+
+  generate(coords) {
+    const { E, N } = this._proj.toNZTM(coords.lat, coords.lng);
+    const code = MapSheet.sheetCode(E, N);
+    const refE = String(Math.round(E / 100) % 1000).padStart(3, '0');
+    const refN = String(Math.round(N / 100) % 1000).padStart(3, '0');
+    return `${code} ${refE} ${refN}`;
+  }
+
+  getTests() {
+    const svc  = new NZTopoSheetService();
+    const near = (a, b, tol = 1e-3) => Math.abs(a - b) <= tol;
+
+    return [
+      // canParse
+      { name: 'Detect sheet ref "BF35 451 438"',
+        run: () => svc.canParse('BF35 451 438'), expected: true },
+      { name: 'Reject decimal lat/lng',
+        run: () => svc.canParse('-41.2865,174.7762'), expected: false },
+      { name: 'Reject incomplete ref "BF35 451"',
+        run: () => svc.canParse('BF35 451'), expected: false },
+
+      // MapSheet.offset (values from LINZ argo-tasks test suite)
+      { name: 'MapSheet.offset("AS00") → x=988000, y=6234000',
+        run: () => { const o = MapSheet.offset('AS00'); return o.x === 988000 && o.y === 6234000; },
+        expected: true },
+      { name: 'MapSheet.offset("AS21") → x=1492000, y=6234000',
+        run: () => { const o = MapSheet.offset('AS21'); return o.x === 1492000 && o.y === 6234000; },
+        expected: true },
+      { name: 'MapSheet.offset("BG33") → x=1780000, y=5730000',
+        run: () => { const o = MapSheet.offset('BG33'); return o.x === 1780000 && o.y === 5730000; },
+        expected: true },
+      { name: 'MapSheet.offset("BW14") → x=1324000, y=5226000',
+        run: () => { const o = MapSheet.offset('BW14'); return o.x === 1324000 && o.y === 5226000; },
+        expected: true },
+
+      // MapSheet.sheetCode
+      { name: 'MapSheet.sheetCode(988000, 6234000) → "AS00"',
+        run: () => MapSheet.sheetCode(988000, 6234000) === 'AS00', expected: true },
+      { name: 'MapSheet.sheetCode(988000, 5982000) → "AZ00"',
+        run: () => MapSheet.sheetCode(988000, 5982000) === 'AZ00', expected: true },
+      { name: 'MapSheet.sheetCode(1780000, 5730000) → "BG33"',
+        run: () => MapSheet.sheetCode(1780000, 5730000) === 'BG33', expected: true },
+
+      // MapSheet.isKnown
+      { name: 'MapSheet.isKnown("BF35") → true',
+        run: () => MapSheet.isKnown('BF35'), expected: true },
+      { name: 'MapSheet.isKnown("AS21") → true',
+        run: () => MapSheet.isKnown('AS21'), expected: true },
+      { name: 'MapSheet.isKnown("AA14") → false (not in grid)',
+        run: () => MapSheet.isKnown('AA14'), expected: false },
+
+      // Parse against known E/N (BF35 451 438 ↔ E 1845100 N 5743800 per original spec)
+      { name: 'Parse "BF35 451 438" → coords within NZ',
+        run: () => {
+          const c = svc.parse('BF35 451 438');
+          return c.lat > -48 && c.lat < -34 && c.lng > 165 && c.lng < 179;
+        }, expected: true },
+      { name: 'Parse "BF35 451 438" matches E 1845100 N 5743800',
+        run: () => {
+          const c = svc.parse('BF35 451 438');
+          const { E, N } = new NZTM2000().toNZTM(c.lat, c.lng);
+          return Math.abs(E - 1845100) < 1 && Math.abs(N - 5743800) < 1;
+        }, expected: true },
+
+      // Round-trips (100 m ≈ 0.001° tolerance)
+      { name: 'Round-trip Wellington within 100 m',
+        run: () => {
+          const orig = new Coordinates(-41.2865, 174.7762);
+          const back = svc.parse(svc.generate(orig));
+          return near(back.lat, orig.lat) && near(back.lng, orig.lng);
+        }, expected: true },
+      { name: 'Round-trip Auckland within 100 m',
+        run: () => {
+          const orig = new Coordinates(-36.8485, 174.7633);
+          const back = svc.parse(svc.generate(orig));
+          return near(back.lat, orig.lat) && near(back.lng, orig.lng);
+        }, expected: true },
+      { name: 'Round-trip Christchurch within 100 m',
+        run: () => {
+          const orig = new Coordinates(-43.5321, 172.6362);
+          const back = svc.parse(svc.generate(orig));
+          return near(back.lat, orig.lat) && near(back.lng, orig.lng);
+        }, expected: true },
+
+      // ── Gap boundary round-trips ──────────────────────────────────────────
+      // Each pair straddles a missing code (BI, BO, CI) to catch off-by-one errors.
+      { name: 'Round-trip BH00 (last code before BI gap)',
+        run: () => MapSheet.sheetCode(MapSheet.offset('BH00').x, MapSheet.offset('BH00').y) === 'BH00',
+        expected: true },
+      { name: 'Round-trip BJ00 (first code after BI gap)',
+        run: () => MapSheet.sheetCode(MapSheet.offset('BJ00').x, MapSheet.offset('BJ00').y) === 'BJ00',
+        expected: true },
+      { name: 'Round-trip BN00 (last code before BO gap)',
+        run: () => MapSheet.sheetCode(MapSheet.offset('BN00').x, MapSheet.offset('BN00').y) === 'BN00',
+        expected: true },
+      { name: 'Round-trip BP00 (first code after BO gap)',
+        run: () => MapSheet.sheetCode(MapSheet.offset('BP00').x, MapSheet.offset('BP00').y) === 'BP00',
+        expected: true },
+      { name: 'Round-trip CH00 (last code before CI gap)',
+        run: () => MapSheet.sheetCode(MapSheet.offset('CH00').x, MapSheet.offset('CH00').y) === 'CH00',
+        expected: true },
+      { name: 'Round-trip CJ00 (first code after CI gap)',
+        run: () => MapSheet.sheetCode(MapSheet.offset('CJ00').x, MapSheet.offset('CJ00').y) === 'CJ00',
+        expected: true },
+
+      // ── BI→BO cascade (offsetY=21 triggers both gap corrections) ─────────
+      // If the second gap check were `else if`, this would silently produce 'BO00'.
+      { name: 'BI→BO cascade: offsetY=21 produces BP00 not BO00',
+        run: () => {
+          const y = MapSheet.origin.y - 21 * MapSheet.height;
+          return MapSheet.sheetCode(MapSheet.origin.x, y) === 'BP00';
+        }, expected: true },
+
+      // ── Gap codes are never generated ─────────────────────────────────────
+      { name: 'sheetCode never produces BI',
+        run: () => {
+          const y = MapSheet.origin.y - 16 * MapSheet.height;
+          return MapSheet.sheetCode(MapSheet.origin.x, y) !== 'BI00';
+        }, expected: true },
+      { name: 'sheetCode never produces BO',
+        run: () => {
+          const y = MapSheet.origin.y - 21 * MapSheet.height;
+          return MapSheet.sheetCode(MapSheet.origin.x, y) !== 'BO00';
+        }, expected: true },
+      { name: 'sheetCode never produces CI',
+        run: () => {
+          const y = MapSheet.origin.y - 40 * MapSheet.height;
+          return MapSheet.sheetCode(MapSheet.origin.x, y) !== 'CI00';
+        }, expected: true },
+
+      // ── isKnown boundary cases ────────────────────────────────────────────
+      { name: 'isKnown("AS21") → true (first valid NZ sheet)',
+        run: () => MapSheet.isKnown('AS21'), expected: true },
+      { name: 'isKnown("AS20") → false (just outside range)',
+        run: () => MapSheet.isKnown('AS20'), expected: false },
+      { name: 'isKnown("CK09") → true (last valid NZ sheet)',
+        run: () => MapSheet.isKnown('CK09'), expected: true },
+      { name: 'isKnown("CK10") → false (just outside range)',
+        run: () => MapSheet.isKnown('CK10'), expected: false },
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Service Registry — owns the ordered list of all services
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class ServiceRegistry {
+  constructor() {
+    this.services = [
+      new GoogleMapsService(),
+      new NZTopoService(),
+      new LatLngService(),
+      new GeoURIService(),
+      new NZEastingNorthingService(),
+      new NZTopoSheetService(),
+    ];
+  }
+
+  /** Return the first service that claims it can parse the input */
+  detect(input) {
+    const trimmed = input.trim();
+    return this.services.find(s => s.canParse(trimmed)) ?? null;
+  }
+
+  /**
+   * Parse input, detect its service, and return:
+   *   { detectedService, coords, links: [{ service, value }] }
+   * Returns null if no service matches.
+   */
+  convert(input) {
+    const service = this.detect(input);
+    if (!service) return null;
+    const coords  = service.parse(input.trim());
+    if (!coords)  return null;
+    const links = this.services
+      .filter(s => s !== service)
+      .map(s => ({ service: s, value: s.generate(coords) }));
+    return { detectedService: service, coords, links };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TestRunner
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class TestRunner {
+  constructor(registry) {
+    this.registry = registry;
+  }
+
+  runAll() {
+    const suites = [];
+
+    // Service tests
+    for (const svc of this.registry.services) {
+      const tests = svc.getTests().map(t => this._run(t));
+      if (tests.length) suites.push({ name: svc.name, tests });
+    }
+
+    return suites;
+  }
+
+  _run(test) {
+    try {
+      const actual  = test.run();
+      const passed  = actual === test.expected;
+      return { name: test.name, passed, actual, expected: test.expected };
+    } catch (err) {
+      return { name: test.name, passed: false, error: err.message };
+    }
+  }
+
+  render(container) {
+    const suites   = this.runAll();
+    const allTests = suites.flatMap(s => s.tests);
+    const nPass    = allTests.filter(t => t.passed).length;
+    const nFail    = allTests.length - nPass;
+
+    const summary  = document.createElement('div');
+    summary.className = `test-summary ${nFail === 0 ? 'pass' : 'fail'}`;
+    summary.textContent = `${nPass} / ${allTests.length} tests passed${nFail ? ` — ${nFail} failed` : ' ✓'}`;
+    container.appendChild(summary);
+
+    for (const suite of suites) {
+      const div = document.createElement('div');
+      div.className = 'test-suite';
+      div.innerHTML = `<div class="test-suite-name">${escapeHtml(suite.name)}</div>`;
+
+      for (const t of suite.tests) {
+        const item = document.createElement('div');
+        item.className = `test-item ${t.passed ? 'pass' : 'fail'}`;
+        let detail = '';
+        if (!t.passed) {
+          detail = t.error
+            ? ` <span class="detail">Error: ${escapeHtml(t.error)}</span>`
+            : ` <span class="detail">got ${escapeHtml(JSON.stringify(t.actual))}, expected ${escapeHtml(JSON.stringify(t.expected))}</span>`;
+        }
+        item.innerHTML = `<span>${t.passed ? '✅' : '❌'}</span> ${escapeHtml(t.name)}${detail}`;
+        div.appendChild(item);
+      }
+      container.appendChild(div);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// App — main converter UI
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class App {
+  constructor(rootEl) {
+    this.root     = rootEl;
+    this.registry = new ServiceRegistry();
+  }
+
+  init() {
+    this._renderShell();
+    this._bindEvents();
+    this._handleURLParams();
+  }
+
+  _renderShell() {
+    this.root.innerHTML = `
+      <header class="app-header">
+        <h1>🗺 NZ Map Coordinate Converter</h1>
+      </header>
+      <div class="container">
+        <div class="card" id="input-card">
+          <label class="input-label" for="coord-input">
+            Paste a map URL, coordinates, or geo URI
+          </label>
+          <div class="input-row">
+            <input
+              class="coord-input"
+              id="coord-input"
+              type="text"
+              placeholder="e.g. https://www.google.com/maps/@-41.28,174.78,15z"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button class="btn-primary" id="convert-btn">Convert</button>
+          </div>
+          <div class="examples">
+            Examples:
+            <a class="ex" data-val="https://www.google.com/maps/search/?api=1&amp;query=-41.1532071%2C174.8267152">Google Maps</a> ·
+            <a class="ex" data-val="https://www.topomap.co.nz/NZTopoMap?v=2&amp;ll=-42.688366,171.88179&amp;z=12">NZ Topo</a> ·
+            <a class="ex" data-val="-37.4936876,175.1932621">Lat/Lng</a> ·
+            <a class="ex" data-val="geo:-41.2865,174.7762?z=13">Geo URI</a> ·
+            <a class="ex" data-val="E 1845100 N 5743800">NZ E/N</a> ·
+            <a class="ex" data-val="BF35 451 438">Topo50 Sheet</a>
+          </div>
+        </div>
+        <div id="results-card" style="display:none" class="card"></div>
+      </div>
+    `;
+  }
+
+  _bindEvents() {
+    document.getElementById('convert-btn').addEventListener('click', () => this._convert());
+    document.getElementById('coord-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') this._convert();
+    });
+    document.querySelectorAll('.ex').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        document.getElementById('coord-input').value = a.dataset.val;
+        this._convert();
+      });
+    });
+  }
+
+  _handleURLParams() {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q');
+    if (q) {
+      document.getElementById('coord-input').value = decodeURIComponent(q);
+      this._convert();
+    }
+  }
+
+  _convert() {
+    const input      = document.getElementById('coord-input').value.trim();
+    const resultsEl  = document.getElementById('results-card');
+    if (!input) { resultsEl.style.display = 'none'; return; }
+
+    const result = this.registry.convert(input);
+    resultsEl.style.display = 'block';
+    resultsEl.innerHTML = result ? this._renderResult(result) : this._renderError(input);
+
+    // Wire up copy buttons
+    resultsEl.querySelectorAll('.btn-copy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        copyToClipboard(btn.dataset.copy ?? '')
+          .then(() => {
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+              btn.textContent = 'Copy';
+              btn.classList.remove('copied');
+            }, 1800);
+          })
+          .catch(() => {/* silently ignore if all methods fail */});
+      });
+    });
+  }
+
+  _renderResult({ detectedService, coords, links }) {
+    const linkRows = links.map(({ service, value }) => {
+      const display = service.isURL
+        ? `<a href="${escapeHtml(value)}" target="_blank" rel="noopener">${escapeHtml(value)}</a>`
+        : escapeHtml(value);
+      return `
+        <li class="result-item">
+          <span class="result-service">${escapeHtml(service.name)}</span>
+          <span class="result-value">${display}</span>
+          <button class="btn-copy" data-copy="${escapeHtml(value)}">Copy</button>
+        </li>`;
+    }).join('');
+
+    return `
+      <div class="detected-badge">✓ Detected: ${escapeHtml(detectedService.name)}</div>
+      <div class="coords-info">lat ${coords.lat.toFixed(6)}, lng ${coords.lng.toFixed(6)}${coords.zoom !== null ? `, zoom ${coords.zoom}` : ''}</div>
+      <div class="results-heading">Links for other services</div>
+      <ul class="result-list">${linkRows}</ul>
+    `;
+  }
+
+  _renderError(input) {
+    return `
+      <div class="error-box">
+        Could not identify the format of <strong>${escapeHtml(input.substring(0, 80))}${input.length > 80 ? '…' : ''}</strong>.
+        <br>Supported formats: Google Maps URL, NZ Topo URL, decimal lat/lng, geo: URI, NZ Easting/Northing.
+      </div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Clipboard helper — works on HTTPS (Clipboard API) and HTTP/file:// (execCommand)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  // Fallback for HTTP / file:// origins
+  return new Promise((resolve, reject) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+      document.execCommand('copy') ? resolve() : reject(new Error('execCommand failed'));
+    } catch (e) {
+      reject(e);
+    } finally {
+      document.body.removeChild(ta);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Web App Manifest — injected as a data: URI to stay single-file
+// ═══════════════════════════════════════════════════════════════════════════════
+
+(function injectManifest() {
+  const manifest = {
+    name: 'NZ Map Coordinate Converter',
+    short_name: 'NZ Map Conv.',
+    description: 'Convert between NZ map coordinate formats offline.',
+    start_url: './',
+    display: 'standalone',
+    background_color: '#f1f5f9',
+    theme_color: '#2563eb',
+    icons: [
+      {
+        // Simple SVG map-pin icon encoded inline — no external asset needed
+        src: 'data:image/svg+xml,' + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
+          + '<rect width="512" height="512" rx="96" fill="#2563eb"/>'
+          + '<text x="256" y="360" font-size="320" text-anchor="middle" fill="white">🗺</text>'
+          + '</svg>'
+        ),
+        sizes: 'any',
+        type: 'image/svg+xml',
+        purpose: 'any maskable'
+      }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+  const link = document.createElement('link');
+  link.rel  = 'manifest';
+  link.href = URL.createObjectURL(blob);
+  document.head.appendChild(link);
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Service Worker — registered from a Blob URL so no separate sw.js file needed.
+// Caches this page after first load; subsequent visits work fully offline.
+// Only active when the page is served over HTTP(S) (not file://).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+(function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+
+  const CACHE = 'nz-map-conv-v1';
+
+  const swCode = `
+const CACHE = '${CACHE}';
+
+self.addEventListener('install', event => {
+  // Cache the page itself on first install
+  event.waitUntil(
+    caches.open(CACHE).then(cache => cache.add(self.location.origin + self.registration.scope.replace(self.location.origin, '')))
+      .catch(() => {}) // best-effort; don't block install
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  // Remove stale caches from previous versions
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  // Cache-first strategy: serve from cache, fall back to network and update cache
+  if (event.request.method !== 'GET') return;
+  event.respondWith(
+    caches.open(CACHE).then(cache =>
+      cache.match(event.request).then(cached => {
+        const fetchPromise = fetch(event.request).then(response => {
+          if (response && response.status === 200) {
+            cache.put(event.request, response.clone());
+          }
+          return response;
+        }).catch(() => cached); // network failed — return cached copy
+        return cached || fetchPromise;
+      })
+    )
+  );
+});
+`;
+
+  const swBlob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl  = URL.createObjectURL(swBlob);
+
+  navigator.serviceWorker.register(swUrl)
+    .catch(err => console.warn('Service Worker registration failed:', err));
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Bootstrap
+// ═══════════════════════════════════════════════════════════════════════════════
+
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const root   = document.getElementById('root');
+
+  if (params.get('run_tests') === 'true') {
+    root.innerHTML = `
+      <header class="app-header test-header">
+        <h1>🧪 NZ Map Converter — Test Suite</h1>
+      </header>
+      <div class="container" id="test-container"></div>
+    `;
+    const runner = new TestRunner(new ServiceRegistry());
+    runner.render(document.getElementById('test-container'));
+  } else {
+    const app = new App(root);
+    app.init();
+  }
+})();
+</script>
+</body>
+</html>
