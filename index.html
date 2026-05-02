@@ -263,8 +263,8 @@ function escapeHtml(str) {
 
 class Coordinates {
   constructor(lat, lng, zoom = null) {
-    this.lat  = parseFloat(lat);
-    this.lng  = parseFloat(lng);
+    this.lat  = Math.round(parseFloat(lat) * 1e6) / 1e6;
+    this.lng  = Math.round(parseFloat(lng) * 1e6) / 1e6;
     this.zoom = (zoom !== null && zoom !== undefined) ? parseFloat(zoom) : null;
   }
 
