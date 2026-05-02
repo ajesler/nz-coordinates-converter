@@ -1345,7 +1345,7 @@ class App {
     const exampleLinks = this.registry.services
       .map((s, i, arr) => {
         const q = encodeURIComponent(s.exampleValue());
-        return `<a class="ex" href="?q=${q}">${escapeHtml(s.name)}</a>${i < arr.length - 1 ? ' ·' : ''}`;
+        return `<a class="ex" href="?q=${q}" title="${escapeHtml(s.exampleValue())}">${escapeHtml(s.name)}</a>${i < arr.length - 1 ? ' ·' : ''}`;
       })
       .join('\n            ');
 
