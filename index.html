@@ -1465,7 +1465,7 @@ class App {
     }).join('');
 
     return `
-      <div class="detected-badge">✓ Detected: ${escapeHtml(detectedService.name)}</div>
+      <div class="detected-badge">${escapeHtml(detectedService.name)}</div>
       ${warning}
       <ul class="result-list">${linkRows}</ul>
     `;
