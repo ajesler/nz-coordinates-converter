@@ -620,6 +620,16 @@ class GoogleMapsService extends MapService {
         expected: false
       },
       {
+        name: 'Does not match LINZ Basemaps URL',
+        run: () => svc.canParse('https://basemaps.linz.govt.nz/@-41.28,174.78,z15'),
+        expected: false
+      },
+      {
+        name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()),
+        expected: true
+      },
+      {
         name: 'Parse @lat,lng,Nm format',
         run: () => {
           const c = svc.parse('https://www.google.com/maps/@-41.1532071,174.8267152,67m');
@@ -720,6 +730,16 @@ class NZTopoService extends MapService {
         expected: false
       },
       {
+        name: 'Does not match LINZ Basemaps URL',
+        run: () => svc.canParse('https://basemaps.linz.govt.nz/@-41.28,174.78,z15'),
+        expected: false
+      },
+      {
+        name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()),
+        expected: true
+      },
+      {
         name: 'Parse lat, lng and zoom',
         run: () => {
           const c = svc.parse('https://www.topomap.co.nz/NZTopoMap?v=2&ll=-42.688366,171.88179&z=12');
@@ -777,6 +797,24 @@ class LINZBasemapsService extends MapService {
         name: 'Does not match Google Maps URL',
         run: () => svc.canParse('https://www.google.com/maps/@-41.2865,174.7762,15z'),
         expected: false
+      },
+      {
+        name: 'Does not match NZ Topo URL',
+        run: () => svc.canParse('https://www.topomap.co.nz/NZTopoMap?v=2&ll=-41.28,174.78&z=13'),
+        expected: false
+      },
+      {
+        name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()),
+        expected: true
+      },
+      {
+        name: '7dp input is rounded to 6dp by Coordinates',
+        run: () => {
+          const c = svc.parse('https://basemaps.linz.govt.nz/@-41.1106263,175.0948097,z19.34');
+          return c.lat === -41.110626 && c.lng === 175.09481;
+        },
+        expected: true
       },
       {
         name: 'Parse lat, lng and decimal zoom',
@@ -839,6 +877,11 @@ class LatLngService extends MapService {
         name: 'Does not match URL',
         run: () => svc.canParse('https://www.google.com/maps/@-41.28,174.78,15z'),
         expected: false
+      },
+      {
+        name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()),
+        expected: true
       },
       {
         name: 'Parse lat and lng correctly',
@@ -909,7 +952,12 @@ class GeoURIService extends MapService {
         expected: false
       },
       {
-        name: 'Parse lat, lng and zoom',
+        name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()),
+        expected: true
+      },
+      {
+        name: 'Parse geo URI with zoom',
         run: () => {
           const c = svc.parse('geo:37.78918,-122.40335?z=14&(Wikimedia+Foundation)');
           return nearEqual(c.lat, 37.78918) && nearEqual(c.lng, -122.40335) && c.zoom === 14;
@@ -988,6 +1036,11 @@ class NZEastingNorthingService extends MapService {
         name: 'Does not match decimal lat/lng',
         run: () => svc.canParse('-41.2865,174.7762'),
         expected: false
+      },
+      {
+        name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()),
+        expected: true
       },
       {
         name: 'Known value falls within NZ bounds',
@@ -1107,6 +1160,8 @@ class NZTopoSheetService extends MapService {
         run: () => svc.canParse('BF35 451 438'), expected: true },
       { name: 'Reject decimal lat/lng',
         run: () => svc.canParse('-41.2865,174.7762'), expected: false },
+      { name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()), expected: true },
       { name: 'Reject incomplete ref "BF35 451"',
         run: () => svc.canParse('BF35 451'), expected: false },
 
@@ -1290,7 +1345,73 @@ class TestRunner {
       if (tests.length) suites.push({ name: svc.name, tests });
     }
 
+    // Utility suites
+    suites.push(...this._coordinatesTests());
+    suites.push(...this._isInNZTests());
+    suites.push(...this._registryTests());
+
     return suites;
+  }
+
+  _coordinatesTests() {
+    const tests = [
+      {
+        name: '7dp lat rounds to 6dp',
+        run: () => new Coordinates(-41.1234567, 174.0).lat === -41.123457,
+        expected: true
+      },
+      {
+        name: '7dp lng rounds to 6dp',
+        run: () => new Coordinates(-41.0, 174.1234567).lng === 174.123457,
+        expected: true
+      },
+      {
+        name: 'Exactly 6dp is unchanged',
+        run: () => new Coordinates(-41.123456, 174.123456).lat === -41.123456,
+        expected: true
+      },
+      {
+        name: 'Negative values: .5 rounds toward +∞ (Math.round behaviour)',
+        run: () => new Coordinates(-41.1234565, 174.0).lat === -41.123456,
+        expected: true
+      },
+    ].map(t => this._run(t));
+    return [{ name: 'Coordinates', tests }];
+  }
+
+  _isInNZTests() {
+    const tests = [
+      { name: 'Wellington is in NZ',        run: () => isInNZ(-41.2865, 174.7762), expected: true  },
+      { name: 'Auckland is in NZ',           run: () => isInNZ(-36.8485, 174.7633), expected: true  },
+      { name: 'London is not in NZ',         run: () => isInNZ(51.5074, -0.1278),   expected: false },
+      { name: 'Sydney is not in NZ',         run: () => isInNZ(-33.8688, 151.2093), expected: false },
+      { name: 'South boundary (-47.5) in',   run: () => isInNZ(-47.5, 172.0),       expected: true  },
+      { name: 'North boundary (-34.0) in',   run: () => isInNZ(-34.0, 172.0),       expected: true  },
+      { name: 'West boundary (165.5) in',    run: () => isInNZ(-41.0, 165.5),       expected: true  },
+      { name: 'East boundary (178.6) in',    run: () => isInNZ(-41.0, 178.6),       expected: true  },
+      { name: 'Just south of NZ (-47.51)',   run: () => isInNZ(-47.51, 172.0),      expected: false },
+      { name: 'Just north of NZ (-33.99)',   run: () => isInNZ(-33.99, 172.0),      expected: false },
+      { name: 'Just west of NZ (165.49)',    run: () => isInNZ(-41.0, 165.49),      expected: false },
+      { name: 'Just east of NZ (178.61)',    run: () => isInNZ(-41.0, 178.61),      expected: false },
+    ].map(t => this._run(t));
+    return [{ name: 'isInNZ', tests }];
+  }
+
+  _registryTests() {
+    const tests = this.registry.services.map(svc => ({
+      name: `${svc.name}: exampleValue() is detected as itself`,
+      run: () => this.registry.detect(svc.exampleValue()) === svc,
+      expected: true
+    })).map(t => this._run(t));
+
+    // Check no two services both claim to parse the same example input
+    const ambiguityTests = this.registry.services.map(svc => ({
+      name: `${svc.name}: no other service also claims its exampleValue()`,
+      run: () => this.registry.services.filter(s => s.canParse(svc.exampleValue())).length === 1,
+      expected: true
+    })).map(t => this._run(t));
+
+    return [{ name: 'ServiceRegistry', tests: [...tests, ...ambiguityTests] }];
   }
 
   _run(test) {
