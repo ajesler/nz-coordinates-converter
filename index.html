@@ -1361,6 +1361,10 @@ class App {
     document.getElementById('coord-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') this._convert();
     });
+    document.getElementById('coord-input').addEventListener('paste', () => {
+      // Let the paste complete before reading the value
+      setTimeout(() => this._convert(), 0);
+    });
     document.querySelectorAll('.ex').forEach(a => {
       a.addEventListener('click', e => {
         e.preventDefault();
