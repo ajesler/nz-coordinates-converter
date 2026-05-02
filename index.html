@@ -147,14 +147,22 @@
       margin-top: .75rem;
       font-size: .8125rem;
       color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .375rem;
     }
     .examples a {
       color: var(--blue);
       cursor: pointer;
       text-decoration: none;
-      margin: 0 .125rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 9999px;
+      padding: .1875rem .625rem;
+      white-space: nowrap;
     }
-    .examples a:hover { text-decoration: underline; }
+    .examples a:hover { border-color: var(--blue); background: var(--card); }
 
     /* ── Results ── */
     .detected-badge {
@@ -1500,7 +1508,7 @@ class App {
     const exampleLinks = this.registry.services
       .map((s, i, arr) => {
         const q = encodeURIComponent(s.exampleValue());
-        return `<a class="ex" href="?q=${q}" title="${escapeHtml(s.exampleValue())}">${escapeHtml(s.name)}</a>${i < arr.length - 1 ? ' ·' : ''}`;
+        return `<a class="ex" href="?q=${q}" title="${escapeHtml(s.exampleValue())}">${escapeHtml(s.name)}</a>`;
       })
       .join('\n            ');
 
