@@ -1445,13 +1445,14 @@ class App {
 
     // Wire up copy buttons
     resultsEl.querySelectorAll('.btn-copy').forEach(btn => {
+      const originalLabel = btn.textContent;
       btn.addEventListener('click', () => {
         copyToClipboard(btn.dataset.copy ?? '')
           .then(() => {
             btn.textContent = 'Copied!';
             btn.classList.add('copied');
             setTimeout(() => {
-              btn.textContent = 'Copy';
+              btn.textContent = originalLabel;
               btn.classList.remove('copied');
             }, 1800);
           })
@@ -1472,7 +1473,7 @@ class App {
         <li class="result-item">
           <span class="result-service">${escapeHtml(service.name)}</span>
           <span class="result-value">${display}</span>
-          <button class="btn-copy" data-copy="${escapeHtml(value)}">Copy</button>
+          <button class="btn-copy" data-copy="${escapeHtml(value)}">${service.isURL ? 'Copy URL' : 'Copy'}</button>
         </li>`;
     }).join('');
 
