@@ -144,16 +144,6 @@
       margin-bottom: .625rem;
     }
 
-    .results-heading {
-      font-size: .75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: var(--muted);
-      margin-top: 1.25rem;
-      margin-bottom: .625rem;
-    }
-
     .result-list { list-style: none; }
 
     .result-item {
@@ -1477,7 +1467,6 @@ class App {
     return `
       <div class="detected-badge">✓ Detected: ${escapeHtml(detectedService.name)}</div>
       ${warning}
-      <div class="results-heading">Converted formats</div>
       <ul class="result-list">${linkRows}</ul>
     `;
   }
