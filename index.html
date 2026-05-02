@@ -688,6 +688,65 @@ class NZTopoService extends MapService {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LINZ Basemaps  (basemaps.linz.govt.nz)
+// Format: https://basemaps.linz.govt.nz/@lat,lng,z{zoom}
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class LINZBasemapsService extends MapService {
+  get name()  { return 'LINZ Basemaps (Satellite Imagery)'; }
+  get isURL() { return true; }
+  exampleValue() { return 'https://basemaps.linz.govt.nz/@-41.1106263,175.0948097,z19.34'; }
+
+  canParse(input) {
+    return /basemaps\.linz\.govt\.nz/i.test(input);
+  }
+
+  parse(input) {
+    const m = input.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*),z([\d.]+)/i);
+    if (!m) return null;
+    return new Coordinates(parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]));
+  }
+
+  generate(coords) {
+    const z = (coords.zoom ?? 15).toFixed(2);
+    return `https://basemaps.linz.govt.nz/@${coords.lat},${coords.lng},z${z}`;
+  }
+
+  getTests() {
+    const svc = new LINZBasemapsService();
+    return [
+      {
+        name: 'Detect LINZ Basemaps URL',
+        run: () => svc.canParse('https://basemaps.linz.govt.nz/@-41.1106263,175.0948097,z19.34'),
+        expected: true
+      },
+      {
+        name: 'Does not match Google Maps URL',
+        run: () => svc.canParse('https://www.google.com/maps/@-41.2865,174.7762,15z'),
+        expected: false
+      },
+      {
+        name: 'Parse lat, lng and decimal zoom',
+        run: () => {
+          const c = svc.parse('https://basemaps.linz.govt.nz/@-41.1106263,175.0948097,z19.34');
+          return nearEqual(c.lat, -41.1106263) && nearEqual(c.lng, 175.0948097) && nearEqual(c.zoom, 19.34);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip: lat/lng/zoom preserved exactly',
+        run: () => {
+          const orig = new Coordinates(-43.5321, 172.6362, 14);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat) && nearEqual(back.lng, orig.lng) && nearEqual(back.zoom, orig.zoom);
+        },
+        expected: true
+      }
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Decimal Lat/Lng pair
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -779,7 +838,7 @@ class GeoURIService extends MapService {
   }
 
   generate(coords) {
-    const z = Math.round(coords.zoom ?? 14);
+    const z = Math.round(coords.zoom ?? 15);
     return `geo:${coords.lat},${coords.lng}?z=${z}`;
   }
 
@@ -1129,6 +1188,7 @@ class ServiceRegistry {
     this.services = [
       new GoogleMapsService(),
       new NZTopoService(),
+      new LINZBasemapsService(),
       new LatLngService(),
       new GeoURIService(),
       new NZEastingNorthingService(),
