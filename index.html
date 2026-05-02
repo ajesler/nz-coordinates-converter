@@ -1380,15 +1380,23 @@ class App {
       clearBtn.style.display = input.value ? 'block' : 'none';
     };
 
+    let debounceTimer;
+    const debouncedConvert = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => this._convert(), 400);
+    };
+
     document.getElementById('convert-btn').addEventListener('click', () => this._convert());
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') this._convert();
+      if (e.key === 'Enter') { clearTimeout(debounceTimer); this._convert(); }
     });
-    input.addEventListener('input', syncClearBtn);
+    input.addEventListener('input', () => { syncClearBtn(); debouncedConvert(); });
     input.addEventListener('paste', () => {
-      setTimeout(() => { this._convert(); syncClearBtn(); }, 0);
+      // paste fires before the value updates; skip the debounce and convert immediately
+      setTimeout(() => { syncClearBtn(); this._convert(); }, 0);
     });
     clearBtn.addEventListener('click', () => {
+      clearTimeout(debounceTimer);
       input.value = '';
       syncClearBtn();
       this._convert();
