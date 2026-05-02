@@ -72,10 +72,11 @@
 
     .input-row { display: flex; gap: .5rem; }
 
+    .input-wrapper { position: relative; flex: 1; min-width: 0; }
+
     .coord-input {
-      flex: 1;
-      min-width: 0;
-      padding: .625rem .875rem;
+      width: 100%;
+      padding: .625rem 2.25rem .625rem .875rem;
       border: 2px solid var(--border);
       border-radius: 6px;
       font-size: 1rem;
@@ -85,6 +86,22 @@
       transition: border-color .15s;
     }
     .coord-input:focus { border-color: var(--blue); }
+
+    .btn-clear {
+      position: absolute;
+      right: .5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: .25rem;
+      display: none;
+    }
+    .btn-clear:hover { color: var(--text); }
 
     .btn-primary {
       padding: .625rem 1.25rem;
@@ -1342,15 +1359,18 @@ class App {
             Enter a map URL, coordinates, sheet code, or geo URI
           </label>
           <div class="input-row">
-            <input
-              class="coord-input"
-              id="coord-input"
-              type="text"
-              placeholder="Paste or type a URL or coordinate…"
-              autocomplete="off"
-              spellcheck="false"
-              autofocus
-            >
+            <div class="input-wrapper">
+              <input
+                class="coord-input"
+                id="coord-input"
+                type="text"
+                placeholder="Paste or type a URL or coordinate…"
+                autocomplete="off"
+                spellcheck="false"
+                autofocus
+              >
+              <button class="btn-clear" id="clear-btn" aria-label="Clear input">✕</button>
+            </div>
             <button class="btn-primary" id="convert-btn">Convert</button>
           </div>
           <div class="examples">
@@ -1364,19 +1384,33 @@ class App {
   }
 
   _bindEvents() {
+    const input    = document.getElementById('coord-input');
+    const clearBtn = document.getElementById('clear-btn');
+
+    const syncClearBtn = () => {
+      clearBtn.style.display = input.value ? 'block' : 'none';
+    };
+
     document.getElementById('convert-btn').addEventListener('click', () => this._convert());
-    document.getElementById('coord-input').addEventListener('keydown', e => {
+    input.addEventListener('keydown', e => {
       if (e.key === 'Enter') this._convert();
     });
-    document.getElementById('coord-input').addEventListener('paste', () => {
-      // Let the paste complete before reading the value
-      setTimeout(() => this._convert(), 0);
+    input.addEventListener('input', syncClearBtn);
+    input.addEventListener('paste', () => {
+      setTimeout(() => { this._convert(); syncClearBtn(); }, 0);
+    });
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      syncClearBtn();
+      this._convert();
+      input.focus();
     });
     document.querySelectorAll('.ex').forEach(a => {
       a.addEventListener('click', e => {
         e.preventDefault();
         const params = new URLSearchParams(new URL(a.href).search);
-        document.getElementById('coord-input').value = params.get('q') ?? '';
+        input.value = params.get('q') ?? '';
+        syncClearBtn();
         this._convert();
       });
     });
@@ -1386,7 +1420,10 @@ class App {
     const params = new URLSearchParams(window.location.search);
     const q = params.get('q');
     if (q) {
-      document.getElementById('coord-input').value = q;
+      const input    = document.getElementById('coord-input');
+      const clearBtn = document.getElementById('clear-btn');
+      input.value = q;
+      clearBtn.style.display = 'block';
       this._convert();
     }
   }
