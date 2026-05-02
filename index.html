@@ -226,8 +226,6 @@
 
     /* ── Responsive ── */
     @media (max-width: 600px) {
-      .input-row { flex-direction: column; }
-      .btn-primary { width: 100%; }
       .result-item { grid-template-columns: 1fr auto; }
       .result-service { grid-column: 1 / -1; color: var(--text); }
       .result-value { grid-column: 1; }
@@ -506,6 +504,9 @@ class MapService {
 
   /** Array of { name, run(), expected } test cases */
   getTests() { return []; }
+
+  /** A representative example input string for this service */
+  exampleValue() { throw new Error('exampleValue not implemented'); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -515,6 +516,7 @@ class MapService {
 class GoogleMapsService extends MapService {
   get name()  { return 'Google Maps'; }
   get isURL() { return true; }
+  exampleValue() { return 'https://www.google.com/maps/@-41.28,174.78,15z'; }
 
   canParse(input) {
     return /https?:\/\/(www\.|maps\.)?google\.[a-z.]{2,6}\/maps/i.test(input);
@@ -629,6 +631,7 @@ class GoogleMapsService extends MapService {
 class NZTopoService extends MapService {
   get name()  { return 'NZ Topo Map'; }
   get isURL() { return true; }
+  exampleValue() { return 'https://www.topomap.co.nz/NZTopoMap?v=2&ll=-41.28,174.78&z=13'; }
 
   canParse(input) {
     return /topomap\.co\.nz/i.test(input);
@@ -691,6 +694,7 @@ class NZTopoService extends MapService {
 class LatLngService extends MapService {
   get name()  { return 'Decimal Lat/Lng'; }
   get isURL() { return false; }
+  exampleValue() { return '-41.2865, 174.7762'; }
 
   canParse(input) {
     return /^-?\d{1,3}(?:\.\d+)?\s*,\s*-?\d{1,3}(?:\.\d+)?\s*$/.test(input.trim());
@@ -752,6 +756,7 @@ class LatLngService extends MapService {
 class GeoURIService extends MapService {
   get name()  { return 'Geo URI'; }
   get isURL() { return true; }
+  exampleValue() { return 'geo:-41.2865,174.7762?z=13'; }
 
   canParse(input) {
     return /^geo:/i.test(input.trim());
@@ -841,6 +846,7 @@ class NZEastingNorthingService extends MapService {
 
   get name()  { return 'NZ Easting/Northing'; }
   get isURL() { return false; }
+  exampleValue() { return 'E 1745900 N 5427600'; }
 
   canParse(input) {
     return /^E\s*\d{6,8}\s+N\s*\d{6,8}\s*$/i.test(input.trim());
@@ -941,6 +947,7 @@ class NZTopoSheetService extends MapService {
 
   get name()  { return 'NZ Topo50 Sheet'; }
   get isURL() { return false; }
+  exampleValue() { return 'BF35 451 438'; }
 
   canParse(input) {
     return /^[A-Z]{2}\d{2}\s+\d{3}\s+\d{3}$/i.test(input.trim());
@@ -1233,6 +1240,13 @@ class App {
   }
 
   _renderShell() {
+    const exampleLinks = this.registry.services
+      .map((s, i, arr) => {
+        const q = encodeURIComponent(s.exampleValue());
+        return `<a class="ex" href="?q=${q}">${escapeHtml(s.name)}</a>${i < arr.length - 1 ? ' ·' : ''}`;
+      })
+      .join('\n            ');
+
     this.root.innerHTML = `
       <header class="app-header">
         <h1>🗺 NZ Map Coordinate Converter</h1>
@@ -1240,7 +1254,7 @@ class App {
       <div class="container">
         <div class="card" id="input-card">
           <label class="input-label" for="coord-input">
-            Paste a map URL, coordinates, or geo URI
+            Enter a map URL, coordinates, sheet code, or geo URI
           </label>
           <div class="input-row">
             <input
@@ -1255,12 +1269,7 @@ class App {
           </div>
           <div class="examples">
             Examples:
-            <a class="ex" data-val="https://www.google.com/maps/search/?api=1&amp;query=-41.1532071%2C174.8267152">Google Maps</a> ·
-            <a class="ex" data-val="https://www.topomap.co.nz/NZTopoMap?v=2&amp;ll=-42.688366,171.88179&amp;z=12">TopoMap.co.nz URL</a> ·
-            <a class="ex" data-val="-37.4936876,175.1932621">Lat/Lng</a> ·
-            <a class="ex" data-val="geo:-41.2865,174.7762?z=13">Geo URI</a> ·
-            <a class="ex" data-val="E 1845100 N 5743800">NZ E/N</a> ·
-            <a class="ex" data-val="BF35 451 438">Topo50 Sheet Reference</a>
+            ${exampleLinks}
           </div>
         </div>
         <div id="results-card" style="display:none" class="card"></div>
@@ -1276,7 +1285,8 @@ class App {
     document.querySelectorAll('.ex').forEach(a => {
       a.addEventListener('click', e => {
         e.preventDefault();
-        document.getElementById('coord-input').value = a.dataset.val;
+        const params = new URLSearchParams(new URL(a.href).search);
+        document.getElementById('coord-input').value = params.get('q') ?? '';
         this._convert();
       });
     });
@@ -1294,11 +1304,17 @@ class App {
   _convert() {
     const input      = document.getElementById('coord-input').value.trim();
     const resultsEl  = document.getElementById('results-card');
-    if (!input) { resultsEl.style.display = 'none'; return; }
+    if (!input) {
+      resultsEl.style.display = 'none';
+      history.replaceState(null, '', location.pathname);
+      return;
+    }
 
     const result = this.registry.convert(input);
     resultsEl.style.display = 'block';
     resultsEl.innerHTML = result ? this._renderResult(result) : this._renderError(input);
+
+    history.replaceState(null, '', `?q=${encodeURIComponent(input)}`);
 
     // Wire up copy buttons
     resultsEl.querySelectorAll('.btn-copy').forEach(btn => {
@@ -1320,7 +1336,7 @@ class App {
   _renderResult({ detectedService, coords, links }) {
     const linkRows = links.map(({ service, value }) => {
       const display = service.isURL
-        ? `<a href="${escapeHtml(value)}" target="_blank" rel="noopener">${escapeHtml(value)}</a>`
+        ? `<a href="${escapeHtml(value)}" target="_blank" rel="noopener">Open in ${escapeHtml(service.name)} ↗</a>`
         : escapeHtml(value);
       return `
         <li class="result-item">
@@ -1339,10 +1355,14 @@ class App {
   }
 
   _renderError(input) {
+    const rows = this.registry.services.map(s =>
+      `<li><strong>${escapeHtml(s.name)}:</strong> <code>${escapeHtml(s.exampleValue())}</code></li>`
+    ).join('');
     return `
       <div class="error-box">
-        Could not identify the format of <strong>${escapeHtml(input.substring(0, 80))}${input.length > 80 ? '…' : ''}</strong>.
-        <br>Supported formats: Google Maps URL, NZ Topo URL, decimal lat/lng, geo: URI, NZ Easting/Northing.
+        <p>Could not identify the format of <strong>${escapeHtml(input.substring(0, 80))}${input.length > 80 ? '…' : ''}</strong>.</p>
+        <p style="margin-top:.625rem;margin-bottom:.375rem">Supported formats:</p>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:.25rem">${rows}</ul>
       </div>`;
   }
 }
