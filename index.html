@@ -1482,7 +1482,7 @@ class App {
 
   _renderResult({ detectedService, coords, links }) {
     const warning = isInNZ(coords.lat, coords.lng) ? '' :
-      `<div class="warning-box">⚠️ These coordinates appear to be outside New Zealand.</div>`;
+      `<div class="warning-box">⚠️ These coordinates appear to be outside New Zealand, the conversions below may be wrong.</div>`;
 
     const linkRows = links.map(({ service, value }) => {
       const display = service.isURL
