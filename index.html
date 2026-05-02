@@ -130,8 +130,14 @@
     .coords-info {
       font-size: .8125rem;
       color: var(--muted);
-      font-family: var(--mono);
       margin-bottom: 1.25rem;
+    }
+    .coords-info-label {
+      font-weight: 500;
+      margin-right: .25rem;
+    }
+    .coords-info-value {
+      font-family: var(--mono);
     }
 
     .results-heading {
@@ -1435,7 +1441,7 @@ class App {
 
     return `
       <div class="detected-badge">✓ Detected: ${escapeHtml(detectedService.name)}</div>
-      <div class="coords-info">lat ${coords.lat.toFixed(6)}, lng ${coords.lng.toFixed(6)}${coords.zoom !== null ? `, zoom ${coords.zoom}` : ''}</div>
+      <div class="coords-info"><span class="coords-info-label">Resolved position:</span><span class="coords-info-value">lat ${coords.lat.toFixed(6)}, lng ${coords.lng.toFixed(6)}${coords.zoom !== null ? `, zoom ${coords.zoom}` : ''}</span></div>
       ${warning}
       <div class="results-heading">Converted formats</div>
       <ul class="result-list">${linkRows}</ul>
