@@ -998,7 +998,7 @@ class GeoURIService extends MapService {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NZ Easting / Northing  (NZTM2000, EPSG:2193)
-// Format: "E 1845100 N 5743800"
+// Formats: "E 1845100 N 5743800"  or  "1845100E 5743800N"
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class NZEastingNorthingService extends MapService {
@@ -1012,11 +1012,17 @@ class NZEastingNorthingService extends MapService {
   exampleValue() { return 'E 1745900 N 5427600'; }
 
   canParse(input) {
-    return /^E\s*\d{6,8}\s+N\s*\d{6,8}\s*$/i.test(input.trim());
+    const t = input.trim();
+    return /^E\s*\d{6,8}\s+N\s*\d{6,8}$/i.test(t) ||
+           /^\d{6,8}\s*E\s+\d{6,8}\s*N$/i.test(t);
   }
 
   parse(input) {
-    const m = input.trim().match(/E\s*(\d+)\s+N\s*(\d+)/i);
+    const t = input.trim();
+    // "E 1845100 N 5743800" style
+    let m = t.match(/^E\s*(\d+)\s+N\s*(\d+)$/i);
+    // "1845100E 5743800N" style
+    if (!m) m = t.match(/^(\d+)\s*E\s+(\d+)\s*N$/i);
     if (!m) return null;
     const { lat, lng } = this._proj.fromNZTM(parseInt(m[1]), parseInt(m[2]));
     return new Coordinates(lat, lng);
@@ -1036,6 +1042,11 @@ class NZEastingNorthingService extends MapService {
         expected: true
       },
       {
+        name: 'Detect 1234567E 7654321N format',
+        run: () => svc.canParse('1758997E 5448611N'),
+        expected: true
+      },
+      {
         name: 'Does not match decimal lat/lng',
         run: () => svc.canParse('-41.2865,174.7762'),
         expected: false
@@ -1043,6 +1054,15 @@ class NZEastingNorthingService extends MapService {
       {
         name: 'exampleValue() is recognised by canParse',
         run: () => svc.canParse(svc.exampleValue()),
+        expected: true
+      },
+      {
+        name: 'Parse 1234567E 7654321N format matches E/N parse',
+        run: () => {
+          const a = svc.parse('E 1758997 N 5448611');
+          const b = svc.parse('1758997E 5448611N');
+          return nearEqual(a.lat, b.lat) && nearEqual(a.lng, b.lng);
+        },
         expected: true
       },
       {
