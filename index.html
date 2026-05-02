@@ -25,6 +25,9 @@
       --red:        #dc2626;
       --red-bg:     #fef2f2;
       --red-text:   #b91c1c;
+      --amber-bg:   #fffbeb;
+      --amber-text: #92400e;
+      --amber-border: #fcd34d;
       --bg:         #f1f5f9;
       --card:       #ffffff;
       --text:       #0f172a;
@@ -191,6 +194,16 @@
       font-size: .9375rem;
     }
 
+    .warning-box {
+      background: var(--amber-bg);
+      border: 1px solid var(--amber-border);
+      border-radius: var(--radius);
+      padding: .625rem 1rem;
+      color: var(--amber-text);
+      font-size: .875rem;
+      margin-bottom: .75rem;
+    }
+
     /* ── Tests ── */
     .test-summary {
       padding: .875rem 1.25rem;
@@ -247,6 +260,12 @@
 
 function nearEqual(a, b, tol = 1e-6) {
   return Math.abs(a - b) <= tol;
+}
+
+// Bounding box covering NZ mainland, Stewart Island, and nearby coastal islands.
+// Excludes distant territories (Chatham, Kermadec, Subantarctic).
+function isInNZ(lat, lng) {
+  return lat >= -47.5 && lat <= -34.0 && lng >= 165.5 && lng <= 178.6;
 }
 
 function escapeHtml(str) {
@@ -1186,13 +1205,13 @@ class NZTopoSheetService extends MapService {
 class ServiceRegistry {
   constructor() {
     this.services = [
+      new LatLngService(),
+      new LINZBasemapsService(),
       new GoogleMapsService(),
       new NZTopoService(),
-      new LINZBasemapsService(),
-      new LatLngService(),
       new GeoURIService(),
-      new NZEastingNorthingService(),
       new NZTopoSheetService(),
+      new NZEastingNorthingService(),
     ];
   }
 
@@ -1356,7 +1375,7 @@ class App {
     const params = new URLSearchParams(window.location.search);
     const q = params.get('q');
     if (q) {
-      document.getElementById('coord-input').value = decodeURIComponent(q);
+      document.getElementById('coord-input').value = q;
       this._convert();
     }
   }
@@ -1394,6 +1413,9 @@ class App {
   }
 
   _renderResult({ detectedService, coords, links }) {
+    const warning = isInNZ(coords.lat, coords.lng) ? '' :
+      `<div class="warning-box">⚠️ These coordinates appear to be outside New Zealand.</div>`;
+
     const linkRows = links.map(({ service, value }) => {
       const display = service.isURL
         ? `<a href="${escapeHtml(value)}" target="_blank" rel="noopener">Open in ${escapeHtml(service.name)} ↗</a>`
@@ -1409,6 +1431,7 @@ class App {
     return `
       <div class="detected-badge">✓ Detected: ${escapeHtml(detectedService.name)}</div>
       <div class="coords-info">lat ${coords.lat.toFixed(6)}, lng ${coords.lng.toFixed(6)}${coords.zoom !== null ? `, zoom ${coords.zoom}` : ''}</div>
+      ${warning}
       <div class="results-heading">Links for other services</div>
       <ul class="result-list">${linkRows}</ul>
     `;
