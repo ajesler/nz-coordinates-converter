@@ -170,7 +170,7 @@
 
     .result-item {
       display: grid;
-      grid-template-columns: 175px 1fr auto;
+      grid-template-columns: minmax(120px, 175px) 1fr auto;
       align-items: center;
       gap: .75rem;
       padding: .75rem 0;
@@ -270,6 +270,7 @@
     }
     @media (max-width: 400px) {
       .card { padding: 1rem; }
+      .result-item { grid-template-columns: minmax(0, 1fr) auto; }
     }
   </style>
 </head>
