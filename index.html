@@ -686,6 +686,82 @@ class GoogleMapsService extends MapService {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Apple Maps
+// Format: https://maps.apple.com/?ll=lat,lng
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class AppleMapsService extends MapService {
+  get name()  { return 'Apple Maps'; }
+  get isURL() { return true; }
+  exampleValue() { return 'https://maps.apple.com/?ll=-41.2865,174.7762'; }
+
+  canParse(input) {
+    return /maps\.apple\.com/i.test(input);
+  }
+
+  parse(input) {
+    const m = input.match(/[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/i);
+    if (!m) return null;
+    return new Coordinates(parseFloat(m[1]), parseFloat(m[2]));
+  }
+
+  generate(coords) {
+    return `https://maps.apple.com/?ll=${coords.lat},${coords.lng}&q=Pin`;
+  }
+
+  getTests() {
+    const svc = new AppleMapsService();
+    return [
+      {
+        name: 'Detect Apple Maps URL',
+        run: () => svc.canParse('https://maps.apple.com/?ll=-41.2865,174.7762'),
+        expected: true
+      },
+      {
+        name: 'Does not match Google Maps URL',
+        run: () => svc.canParse('https://www.google.com/maps/@-41.2865,174.7762,15z'),
+        expected: false
+      },
+      {
+        name: 'Does not match NZ Topo URL',
+        run: () => svc.canParse('https://www.topomap.co.nz/NZTopoMap?v=2&ll=-41.28,174.78&z=13'),
+        expected: false
+      },
+      {
+        name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()),
+        expected: true
+      },
+      {
+        name: 'Parse ll= parameter',
+        run: () => {
+          const c = svc.parse('https://maps.apple.com/?ll=-41.2865,174.7762');
+          return nearEqual(c.lat, -41.2865) && nearEqual(c.lng, 174.7762);
+        },
+        expected: true
+      },
+      {
+        name: 'Parse ll= when other params present',
+        run: () => {
+          const c = svc.parse('https://maps.apple.com/?q=Wellington&ll=-41.2865,174.7762&z=13');
+          return nearEqual(c.lat, -41.2865) && nearEqual(c.lng, 174.7762);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip: lat/lng preserved within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-41.2865, 174.7762);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      }
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // NZ Topo Map  (topomap.co.nz)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1554,6 +1630,7 @@ class ServiceRegistry {
       new LatLngService(),
       new LINZBasemapsService(),
       new GoogleMapsService(),
+      new AppleMapsService(),
       new NZTopoService(),
       new GeoURIService(),
       new NZTopoSheetService(),
@@ -1883,7 +1960,7 @@ class App {
 
   _renderError(input) {
     const rows = this.registry.services.map(s =>
-      `<li><strong>${escapeHtml(s.name)}:</strong> <code>${escapeHtml(s.exampleValue())}</code></li>`
+      `<li><strong>${escapeHtml(s.name)}:</strong> <code style="word-break:break-all">${escapeHtml(s.exampleValue())}</code></li>`
     ).join('');
     return `
       <div class="error-box">
