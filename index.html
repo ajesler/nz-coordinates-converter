@@ -784,6 +784,83 @@ class AppleMapsService extends MapService {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// OpenStreetMap
+// Format: https://www.openstreetmap.org/#map=15/-41.2865/174.7762
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class OpenStreetMapService extends MapService {
+  get name()  { return 'OpenStreetMap'; }
+  get isURL() { return true; }
+  exampleValue() { return 'https://www.openstreetmap.org/#map=15/-41.2865/174.7762'; }
+
+  canParse(input) {
+    return /openstreetmap\.org/i.test(input);
+  }
+
+  parse(input) {
+    // Hash format: #map=zoom/lat/lng
+    const hash = input.match(/#map=\d+\/(-?\d+\.?\d*)\/(-?\d+\.?\d*)/);
+    if (hash) return new Coordinates(parseFloat(hash[1]), parseFloat(hash[2]));
+    // Query param format: ?mlat=lat&mlon=lng
+    const mlat = input.match(/[?&]mlat=(-?\d+\.?\d*)/);
+    const mlon = input.match(/[?&]mlon=(-?\d+\.?\d*)/);
+    if (mlat && mlon) return new Coordinates(parseFloat(mlat[1]), parseFloat(mlon[1]));
+    return null;
+  }
+
+  generate(coords) {
+    const z = Math.round(coords.zoom ?? 15);
+    return `https://www.openstreetmap.org/#map=${z}/${coords.lat}/${coords.lng}`;
+  }
+
+  getTests() {
+    const svc = new OpenStreetMapService();
+    return [
+      {
+        name: 'Detect OSM hash URL',
+        run: () => svc.canParse('https://www.openstreetmap.org/#map=15/-41.2865/174.7762'),
+        expected: true
+      },
+      {
+        name: 'Detect OSM mlat/mlon URL',
+        run: () => svc.canParse('https://www.openstreetmap.org/?mlat=-41.2865&mlon=174.7762'),
+        expected: true
+      },
+      {
+        name: 'Does not match Google Maps URL',
+        run: () => svc.canParse('https://www.google.com/maps/@-41.2865,174.7762,15z'),
+        expected: false
+      },
+      {
+        name: 'Parse hash format',
+        run: () => {
+          const c = svc.parse('https://www.openstreetmap.org/#map=15/-41.2865/174.7762');
+          return nearEqual(c.lat, -41.2865) && nearEqual(c.lng, 174.7762);
+        },
+        expected: true
+      },
+      {
+        name: 'Parse mlat/mlon format',
+        run: () => {
+          const c = svc.parse('https://www.openstreetmap.org/?mlat=-41.2865&mlon=174.7762');
+          return nearEqual(c.lat, -41.2865) && nearEqual(c.lng, 174.7762);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip: lat/lng preserved within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-41.2865, 174.7762);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      },
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // NZ Topo Map  (topomap.co.nz)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1836,6 +1913,7 @@ class ServiceRegistry {
       new NZTopoService(),
       new GeoURIService(),
       new AppleMapsService(),
+      new OpenStreetMapService(),
       new DegreesMinutesSecondsService(),
       new DecimalDegreesMinutesService(),
     ];
