@@ -2202,6 +2202,8 @@ class App {
         syncClearBtn();
         syncExamples();
         this._convert();
+        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        input.focus();
       });
     });
   }
