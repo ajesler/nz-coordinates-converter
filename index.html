@@ -1370,10 +1370,19 @@ class DegreesMinutesSecondsService extends MapService {
 
   _toDMS(decimal) {
     const abs     = Math.abs(decimal);
-    const deg     = Math.floor(abs);
+    let   deg     = Math.floor(abs);
     const minFull = (abs - deg) * 60;
-    const min     = Math.floor(minFull);
-    const sec     = (minFull - min) * 60;
+    let   min     = Math.floor(minFull);
+    let   sec     = (minFull - min) * 60;
+
+    // Floating-point arithmetic can produce seconds values like 59.9964 which
+    // toFixed(1) rounds up to "60.0". Roll over into the next minute/degree.
+    if (parseFloat(sec.toFixed(1)) >= 60) {
+      sec = 0;
+      min += 1;
+      if (min >= 60) { min = 0; deg += 1; }
+    }
+
     return { deg, min, sec };
   }
 
@@ -1482,6 +1491,33 @@ class DegreesMinutesSecondsService extends MapService {
           const orig = new Coordinates(-43.5321, 172.6362);
           const back = svc.parse(svc.generate(orig));
           return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'generate() never produces seconds >= 60 (seconds rollover)',
+        run: () => {
+          // -41.29999 raw seconds = 59.964, which toFixed(1) rounds to "60.0" without the fix
+          const out = svc.generate(new Coordinates(-41.29999, 174.0));
+          return !out.includes("60.0\"");
+        },
+        expected: true
+      },
+      {
+        name: 'generate() rolls seconds over into minutes correctly',
+        run: () => {
+          const out = svc.generate(new Coordinates(-41.29999, 174.0));
+          // should produce 41°18'0.0"S not 41°17'60.0"S
+          return out.startsWith('41°18\'');
+        },
+        expected: true
+      },
+      {
+        name: 'generate() rolls minutes over into degrees correctly',
+        run: () => {
+          // -36.99999 → raw sec = 59.964 → rolls to min=60 → deg rollover
+          const out = svc.generate(new Coordinates(-36.99999, 174.0));
+          return out.startsWith('37°0\'');
         },
         expected: true
       }
