@@ -1093,13 +1093,13 @@ class GeoURIService extends MapService {
 // Formats: "E 1845100 N 5743800"  or  "1845100E 5743800N"
 // ═══════════════════════════════════════════════════════════════════════════════
 
-class NZEastingNorthingService extends MapService {
+class NZTMEastingNorthingService extends MapService {
   constructor() {
     super();
     this._proj = new NZTM2000();
   }
 
-  get name()  { return 'NZ Easting/Northing'; }
+  get name()  { return 'NZTM Easting/Northing'; }
   get isURL() { return false; }
   get nzOnly() { return true; }
   exampleValue() { return 'E 1745900 N 5427600'; }
@@ -1127,7 +1127,7 @@ class NZEastingNorthingService extends MapService {
   }
 
   getTests() {
-    const svc = new NZEastingNorthingService();
+    const svc = new NZTMEastingNorthingService();
     return [
       {
         name: 'Detect E/N format',
@@ -1831,7 +1831,7 @@ class ServiceRegistry {
       new LINZBasemapsService(),
       new GoogleMapsService(),
       new NZTopoSheetService(),
-      new NZEastingNorthingService(),
+      new NZTMEastingNorthingService(),
       new NZTopoService(),
       new GeoURIService(),
       new AppleMapsService(),
@@ -1947,7 +1947,7 @@ class TestRunner {
       expected: true
     })).map(t => this._run(t));
 
-    const nzOnlyServices = ['NZ Easting/Northing', 'NZ Topo50 Sheet'];
+    const nzOnlyServices = ['NZTM Easting/Northing', 'NZ Topo50 Sheet'];
     const nzOnlyTests = [
       ...nzOnlyServices.map(name => ({
         name: `${name}: nzOnly === true`,
