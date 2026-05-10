@@ -1621,6 +1621,183 @@ class DegreesMinutesSecondsService extends MapService {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Decimal Degrees Minutes  (DDM)
+// Format: 41°17.190'S, 174°46.572'E
+// Like DMS but with decimal minutes and no seconds component.
+// Common on GPS hardware (Garmin etc.) and many NZ tramping apps.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class DecimalDegreesMinutesService extends MapService {
+  get name()  { return 'Decimal Degrees Minutes'; }
+  get isURL() { return false; }
+  exampleValue() { return '41°17.190\'S, 174°46.572\'E'; }
+
+  // Regex for one DDM component: [H]DDD°MM.mmm'[H]
+  static _partRe() {
+    return String.raw`([NSEW]?)\s*(\d{1,3})[°º]\s*(\d{1,2}(?:\.\d+)?)[′']\s*([NSEW]?)`;
+  }
+
+  static _fullRe() {
+    const p = DecimalDegreesMinutesService._partRe();
+    return new RegExp(`^\\s*${p}\\s*[,;]\\s*${p}\\s*$`, 'i');
+  }
+
+  canParse(input) {
+    if (!/[°º]/.test(input)) return false;
+    // Reject DMS — if a seconds symbol is present this is DMS not DDM
+    if (/[″"]/.test(input)) return false;
+    return DecimalDegreesMinutesService._fullRe().test(input.trim());
+  }
+
+  _parsePart(hPre, deg, min, hSuf) {
+    const h   = (hPre || hSuf).toUpperCase();
+    const val = parseFloat(deg) + parseFloat(min) / 60;
+    return (h === 'S' || h === 'W') ? -val : val;
+  }
+
+  parse(input) {
+    const m = DecimalDegreesMinutesService._fullRe().exec(input.trim());
+    if (!m) return null;
+
+    // Groups: [1]=h1pre [2]=deg1 [3]=min1 [4]=h1suf
+    //         [5]=h2pre [6]=deg2 [7]=min2 [8]=h2suf
+    const first  = this._parsePart(m[1], m[2], m[3], m[4]);
+    const second = this._parsePart(m[5], m[6], m[7], m[8]);
+
+    const h1 = (m[1] || m[4]).toUpperCase();
+    if (h1 === 'E' || h1 === 'W') {
+      return new Coordinates(second, first);
+    }
+    return new Coordinates(first, second);
+  }
+
+  _toDDM(decimal) {
+    const abs = Math.abs(decimal);
+    let   deg = Math.floor(abs);
+    let   min = (abs - deg) * 60;
+
+    // Guard against toFixed(3) rounding minutes up to 60.000
+    if (parseFloat(min.toFixed(3)) >= 60) { min = 0; deg += 1; }
+
+    return { deg, min };
+  }
+
+  generate(coords) {
+    const lat  = this._toDDM(coords.lat);
+    const lng  = this._toDDM(coords.lng);
+    const latH = coords.lat >= 0 ? 'N' : 'S';
+    const lngH = coords.lng >= 0 ? 'E' : 'W';
+    return `${lat.deg}°${lat.min.toFixed(3)}'${latH}, ${lng.deg}°${lng.min.toFixed(3)}'${lngH}`;
+  }
+
+  getTests() {
+    const svc = new DecimalDegreesMinutesService();
+    return [
+      {
+        name: 'Detect suffix-hemisphere DDM',
+        run: () => svc.canParse('41°17.190\'S, 174°46.572\'E'),
+        expected: true
+      },
+      {
+        name: 'Detect prefix-hemisphere DDM',
+        run: () => svc.canParse('S41°17.190\', E174°46.572\''),
+        expected: true
+      },
+      {
+        name: 'Does not match DMS (has seconds symbol)',
+        run: () => svc.canParse('41°17\'11.4"S, 174°46\'34.3"E'),
+        expected: false
+      },
+      {
+        name: 'Does not match decimal lat/lng (no degree symbol)',
+        run: () => svc.canParse('-41.2865, 174.7762'),
+        expected: false
+      },
+      {
+        name: 'Does not match URL',
+        run: () => svc.canParse('https://www.google.com/maps/@-41.28,174.78,15z'),
+        expected: false
+      },
+      {
+        name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()),
+        expected: true
+      },
+      {
+        name: 'Parse suffix-hemisphere: Wellington within 0.0001°',
+        run: () => {
+          const c = svc.parse('41°17.190\'S, 174°46.572\'E');
+          return nearEqual(c.lat, -41.2865, 1e-4) && nearEqual(c.lng, 174.7762, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Parse prefix-hemisphere: Wellington within 0.0001°',
+        run: () => {
+          const c = svc.parse('S41°17.190\', E174°46.572\'');
+          return nearEqual(c.lat, -41.2865, 1e-4) && nearEqual(c.lng, 174.7762, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'lat is negative for S hemisphere',
+        run: () => svc.parse('41°17.190\'S, 174°46.572\'E').lat < 0,
+        expected: true
+      },
+      {
+        name: 'lng is positive for E hemisphere',
+        run: () => svc.parse('41°17.190\'S, 174°46.572\'E').lng > 0,
+        expected: true
+      },
+      {
+        name: 'generate() never produces minutes >= 60 (minutes rollover)',
+        run: () => {
+          const out = svc.generate(new Coordinates(-41.99999, 174.0));
+          return !out.includes("60.000'");
+        },
+        expected: true
+      },
+      {
+        name: 'generate() rolls minutes over into degrees correctly',
+        run: () => {
+          // -41.999992 → min = 59.99952, toFixed(3) rounds to "60.000" → deg rollover
+          const out = svc.generate(new Coordinates(-41.999992, 174.0));
+          return out.startsWith('42°0.000\'');
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip Wellington within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-41.2865, 174.7762);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip Auckland within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-36.8485, 174.7633);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip Christchurch within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-43.5321, 172.6362);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      }
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Service Registry — owns the ordered list of all services
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1636,6 +1813,7 @@ class ServiceRegistry {
       new NZTopoSheetService(),
       new NZEastingNorthingService(),
       new DegreesMinutesSecondsService(),
+      new DecimalDegreesMinutesService(),
     ];
   }
 
