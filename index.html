@@ -1306,6 +1306,182 @@ class NZTopoSheetService extends MapService {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Degrees Minutes Seconds  (DMS)
+// Formats: "41°17'11.4"S, 174°46'34.3"E"  or  "S41°17'11.4", E174°46'34.3""
+// Hemisphere letters (N/S/E/W) may appear before or after the value.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class DegreesMinutesSecondsService extends MapService {
+  get name()  { return 'Degrees Minutes Seconds'; }
+  get isURL() { return false; }
+  exampleValue() { return '42°6\'55.2672"S, 171°19\'46.1064"E'; }
+
+  // Regex for one DMS component: [H]DDD°MM'SS.s"[H]
+  // Degree symbol: ° (U+00B0) or º (U+00BA ordinal)
+  // Minute symbol: ′ (U+2032) or ASCII apostrophe
+  // Second symbol: ″ (U+2033) or ASCII double-quote
+  static _partRe() {
+    return String.raw`([NSEW]?)\s*(\d{1,3})[°º]\s*(\d{1,2})[′']\s*(\d{1,2}(?:\.\d+)?)[″"]\s*([NSEW]?)`;
+  }
+
+  static _fullRe() {
+    const p = DegreesMinutesSecondsService._partRe();
+    return new RegExp(`^\\s*${p}\\s*[,;]\\s*${p}\\s*$`, 'i');
+  }
+
+  canParse(input) {
+    // Must contain a degree symbol to avoid collisions with other formats
+    if (!/[°º]/.test(input)) return false;
+    return DegreesMinutesSecondsService._fullRe().test(input.trim());
+  }
+
+  _parsePart(hPre, deg, min, sec, hSuf) {
+    const h   = (hPre || hSuf).toUpperCase();
+    const val = parseFloat(deg) + parseFloat(min) / 60 + parseFloat(sec) / 3600;
+    return (h === 'S' || h === 'W') ? -val : val;
+  }
+
+  parse(input) {
+    const m = DegreesMinutesSecondsService._fullRe().exec(input.trim());
+    if (!m) return null;
+
+    // Groups: [1]=h1pre [2]=deg1 [3]=min1 [4]=sec1 [5]=h1suf
+    //         [6]=h2pre [7]=deg2 [8]=min2 [9]=sec2 [10]=h2suf
+    const first  = this._parsePart(m[1], m[2], m[3], m[4], m[5]);
+    const second = this._parsePart(m[6], m[7], m[8], m[9], m[10]);
+
+    // Detect lat/lng order from hemisphere letters
+    const h1 = (m[1] || m[5]).toUpperCase();
+    if (h1 === 'E' || h1 === 'W') {
+      // First component is longitude — swap
+      return new Coordinates(second, first);
+    }
+    // N/S or no hemisphere letter → first is latitude
+    return new Coordinates(first, second);
+  }
+
+  _toDMS(decimal) {
+    const abs     = Math.abs(decimal);
+    const deg     = Math.floor(abs);
+    const minFull = (abs - deg) * 60;
+    const min     = Math.floor(minFull);
+    const sec     = (minFull - min) * 60;
+    return { deg, min, sec };
+  }
+
+  generate(coords) {
+    const lat  = this._toDMS(coords.lat);
+    const lng  = this._toDMS(coords.lng);
+    const latH = coords.lat >= 0 ? 'N' : 'S';
+    const lngH = coords.lng >= 0 ? 'E' : 'W';
+    return `${lat.deg}°${lat.min}'${lat.sec.toFixed(1)}"${latH}, ${lng.deg}°${lng.min}'${lng.sec.toFixed(1)}"${lngH}`;
+  }
+
+  getTests() {
+    const svc = new DegreesMinutesSecondsService();
+    return [
+      {
+        name: 'Parse exampleValue coordinates correctly',
+        run: () => {
+          const c = svc.parse('42°6\'55.2672"S, 171°19\'46.1064"E');
+          const expectedLat = -(42 + 6/60 + 55.2672/3600);
+          const expectedLng =   171 + 19/60 + 46.1064/3600;
+          return nearEqual(c.lat, expectedLat, 1e-6) && nearEqual(c.lng, expectedLng, 1e-6);
+        },
+        expected: true
+      },
+      {
+        name: 'Detect suffix-hemisphere DMS',
+        run: () => svc.canParse('41°17\'11.4"S, 174°46\'34.3"E'),
+        expected: true
+      },
+      {
+        name: 'Detect prefix-hemisphere DMS',
+        run: () => svc.canParse('S41°17\'11.4", E174°46\'34.3"'),
+        expected: true
+      },
+      {
+        name: 'Does not match decimal lat/lng (no degree symbol)',
+        run: () => svc.canParse('-41.2865, 174.7762'),
+        expected: false
+      },
+      {
+        name: 'Does not match URL',
+        run: () => svc.canParse('https://www.google.com/maps/@-41.28,174.78,15z'),
+        expected: false
+      },
+      {
+        name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()),
+        expected: true
+      },
+      {
+        name: 'Parse suffix-hemisphere: Wellington within 0.0001°',
+        run: () => {
+          const c = svc.parse('41°17\'11.4"S, 174°46\'34.3"E');
+          return nearEqual(c.lat, -41.2865, 1e-4) && nearEqual(c.lng, 174.7762, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Parse prefix-hemisphere: Wellington within 0.0001°',
+        run: () => {
+          const c = svc.parse('S41°17\'11.4", E174°46\'34.3"');
+          return nearEqual(c.lat, -41.2865, 1e-4) && nearEqual(c.lng, 174.7762, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Parse prefix-hemisphere E-first: Auckland within 0.001°',
+        run: () => {
+          // E comes first → second component is latitude
+          const c = svc.parse('E174°45\'48", S36°51\'2.4"');
+          return nearEqual(c.lat, -36.8507, 1e-3) && nearEqual(c.lng, 174.763, 1e-3);
+        },
+        expected: true
+      },
+      {
+        name: 'lat is negative for S hemisphere',
+        run: () => svc.parse('41°0\'0"S, 174°0\'0"E').lat < 0,
+        expected: true
+      },
+      {
+        name: 'lng is positive for E hemisphere',
+        run: () => svc.parse('41°0\'0"S, 174°0\'0"E').lng > 0,
+        expected: true
+      },
+      {
+        name: 'Round-trip Wellington within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-41.2865, 174.7762);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip Auckland within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-36.8485, 174.7633);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip Christchurch within 0.0001°',
+        run: () => {
+          const orig = new Coordinates(-43.5321, 172.6362);
+          const back = svc.parse(svc.generate(orig));
+          return nearEqual(back.lat, orig.lat, 1e-4) && nearEqual(back.lng, orig.lng, 1e-4);
+        },
+        expected: true
+      }
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Service Registry — owns the ordered list of all services
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1319,6 +1495,7 @@ class ServiceRegistry {
       new GeoURIService(),
       new NZTopoSheetService(),
       new NZEastingNorthingService(),
+      new DegreesMinutesSecondsService(),
     ];
   }
 
