@@ -134,12 +134,30 @@
       margin-top: .75rem;
       font-size: .8125rem;
       color: var(--muted);
-      display: flex;
+    }
+    .examples-toggle {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: .8125rem;
+      color: var(--blue);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: .25rem;
+    }
+    .examples-toggle:hover { text-decoration: underline; }
+    .examples-toggle .chevron { transition: transform .2s; display: inline-block; }
+    .examples-toggle.open .chevron { transform: rotate(180deg); }
+    .examples-pills {
+      display: none;
       flex-wrap: wrap;
       align-items: center;
       gap: .375rem;
+      margin-top: .5rem;
     }
-    .examples a {
+    .examples-pills.open { display: flex; }
+    .examples-pills a {
       color: var(--blue);
       cursor: pointer;
       text-decoration: none;
@@ -149,7 +167,7 @@
       padding: .1875rem .625rem;
       white-space: nowrap;
     }
-    .examples a:hover { border-color: var(--blue); background: var(--card); }
+    .examples-pills a:hover { border-color: var(--blue); background: var(--card); }
 
     /* ── Results ── */
     .detected-badge {
@@ -2014,8 +2032,12 @@ class App {
             </div>
           </div>
           <div class="examples">
-            Examples:
-            ${exampleLinks}
+            <button class="examples-toggle" id="examples-toggle" aria-expanded="false" aria-controls="examples-pills">
+              Examples <span class="chevron">▾</span>
+            </button>
+            <div class="examples-pills" id="examples-pills">
+              ${exampleLinks}
+            </div>
           </div>
         </div>
         <div id="results-card" style="display:none" class="card"></div>
@@ -2044,24 +2066,40 @@ class App {
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter') { clearTimeout(debounceTimer); this._convert(); }
     });
-    input.addEventListener('input', () => { syncClearBtn(); debouncedConvert(); });
     input.addEventListener('paste', () => {
       // paste fires before the value updates; skip the debounce and convert immediately
-      setTimeout(() => { syncClearBtn(); this._convert(); }, 0);
+      setTimeout(() => { syncClearBtn(); syncExamples(); this._convert(); }, 0);
     });
     clearBtn.addEventListener('click', () => {
       clearTimeout(debounceTimer);
       input.value = '';
       syncClearBtn();
+      syncExamples();
       this._convert();
       input.focus();
     });
+    const toggle   = document.getElementById('examples-toggle');
+    const pills    = document.getElementById('examples-pills');
+    const setExamplesOpen = (open) => {
+      pills.classList.toggle('open', open);
+      toggle.classList.toggle('open', open);
+      toggle.setAttribute('aria-expanded', open);
+    };
+    this._setExamplesOpen = setExamplesOpen;
+    toggle.addEventListener('click', () => setExamplesOpen(!pills.classList.contains('open')));
+
+    // Auto-expand when input is empty, auto-collapse when it has content.
+    const syncExamples = () => setExamplesOpen(!input.value);
+    input.addEventListener('input', () => { syncClearBtn(); syncExamples(); debouncedConvert(); });
+    setExamplesOpen(true);
+
     document.querySelectorAll('.ex').forEach(a => {
       a.addEventListener('click', e => {
         e.preventDefault();
         const params = new URLSearchParams(new URL(a.href).search);
         input.value = params.get('q') ?? '';
         syncClearBtn();
+        syncExamples();
         this._convert();
       });
     });
@@ -2075,6 +2113,7 @@ class App {
       const clearBtn = document.getElementById('clear-btn');
       input.value = q;
       clearBtn.style.display = 'block';
+      this._setExamplesOpen(false);
       this._convert();
     }
   }
