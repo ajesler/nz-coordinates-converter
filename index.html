@@ -589,7 +589,7 @@ class MapService {
 class GoogleMapsService extends MapService {
   get name()  { return 'Google Maps'; }
   get isURL() { return true; }
-  exampleValue() { return 'https://www.google.com/maps/@-41.28,174.78,15z'; }
+  exampleValue() { return 'https://www.google.com/maps/@-40.680490,175.546903,15z'; }
 
   canParse(input) {
     return /https?:\/\/(www\.|maps\.)?google\.[a-z.]{2,6}\/maps/i.test(input);
@@ -715,7 +715,7 @@ class GoogleMapsService extends MapService {
 class AppleMapsService extends MapService {
   get name()  { return 'Apple Maps'; }
   get isURL() { return true; }
-  exampleValue() { return 'https://maps.apple.com/?ll=-41.2865,174.7762'; }
+  exampleValue() { return 'https://maps.apple.com/?ll=-40.680490,175.546903'; }
 
   canParse(input) {
     return /maps\.apple\.com/i.test(input);
@@ -785,13 +785,13 @@ class AppleMapsService extends MapService {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // OpenStreetMap
-// Format: https://www.openstreetmap.org/?mlat=-41.2865&mlon=174.7762
+// Format: https://www.openstreetmap.org/?mlat=-40.680490&mlon=175.546903
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class OpenStreetMapService extends MapService {
   get name()  { return 'OpenStreetMap'; }
   get isURL() { return true; }
-  exampleValue() { return 'https://www.openstreetmap.org/?mlat=-41.2865&mlon=174.7762'; }
+  exampleValue() { return 'https://www.openstreetmap.org/?mlat=-40.680490&mlon=175.546903'; }
 
   canParse(input) {
     return /openstreetmap\.org/i.test(input);
@@ -1083,7 +1083,7 @@ class LatLngService extends MapService {
 class GeoURIService extends MapService {
   get name()  { return 'Geo URI'; }
   get isURL() { return true; }
-  exampleValue() { return 'geo:-41.2865,174.7762?z=13'; }
+  exampleValue() { return 'geo:-45.0615432,168.8049711?z=13'; }
 
   canParse(input) {
     return /^geo:/i.test(input.trim());
@@ -1326,7 +1326,7 @@ class NZTopoSheetService extends MapService {
   get name()  { return 'NZ Topo50 Sheet'; }
   get isURL() { return false; }
   get nzOnly() { return true; }
-  exampleValue() { return 'BF35 451 438'; }
+  exampleValue() { return 'BR23 619 998'; }
 
   canParse(input) {
     return /^[A-Z]{2}\d{2}\s*\d{3}\s*\d{3}$/i.test(input.trim());
