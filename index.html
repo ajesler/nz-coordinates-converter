@@ -1133,11 +1133,11 @@ class NZTopoSheetService extends MapService {
   exampleValue() { return 'BF35 451 438'; }
 
   canParse(input) {
-    return /^[A-Z]{2}\d{2}\s+\d{3}\s+\d{3}$/i.test(input.trim());
+    return /^[A-Z]{2}\d{2}\s*\d{3}\s*\d{3}$/i.test(input.trim());
   }
 
   parse(input) {
-    const m = input.trim().match(/^([A-Z]{2}\d{2})\s+(\d{3})\s+(\d{3})$/i);
+    const m = input.trim().match(/^([A-Z]{2}\d{2})\s*(\d{3})\s*(\d{3})$/i);
     if (!m) return null;
 
     const code = m[1].toUpperCase();
@@ -1176,6 +1176,14 @@ class NZTopoSheetService extends MapService {
       // canParse
       { name: 'Detect sheet ref "BF35 451 438"',
         run: () => svc.canParse('BF35 451 438'), expected: true },
+      { name: 'Detect sheet ref without spaces "BF35451438"',
+        run: () => svc.canParse('BF35451438'), expected: true },
+      { name: 'Parse without spaces matches parse with spaces',
+        run: () => {
+          const a = svc.parse('BF35 451 438');
+          const b = svc.parse('BF35451438');
+          return nearEqual(a.lat, b.lat) && nearEqual(a.lng, b.lng);
+        }, expected: true },
       { name: 'Reject decimal lat/lng',
         run: () => svc.canParse('-41.2865,174.7762'), expected: false },
       { name: 'exampleValue() is recognised by canParse',
