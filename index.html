@@ -203,6 +203,7 @@
       min-width: 0;
       font-family: var(--mono);
     }
+    .result-value.muted { font-family: inherit; color: var(--muted); font-style: italic; }
     .result-value a { color: var(--blue); text-decoration: none; }
     .result-value a:hover { text-decoration: underline; }
 
@@ -560,6 +561,9 @@ class MapService {
 
   /** True when generate() returns an http(s)/geo URL */
   get isURL() { return false; }
+
+  /** True when this service only makes sense for NZ coordinates */
+  get nzOnly() { return false; }
 
   /** Returns true if this service can attempt to parse the given string */
   canParse(input) { throw new Error('canParse not implemented'); }
@@ -1097,6 +1101,7 @@ class NZEastingNorthingService extends MapService {
 
   get name()  { return 'NZ Easting/Northing'; }
   get isURL() { return false; }
+  get nzOnly() { return true; }
   exampleValue() { return 'E 1745900 N 5427600'; }
 
   canParse(input) {
@@ -1242,6 +1247,7 @@ class NZTopoSheetService extends MapService {
 
   get name()  { return 'NZ Topo50 Sheet'; }
   get isURL() { return false; }
+  get nzOnly() { return true; }
   exampleValue() { return 'BF35 451 438'; }
 
   canParse(input) {
@@ -1826,9 +1832,9 @@ class ServiceRegistry {
       new GoogleMapsService(),
       new NZTopoSheetService(),
       new NZEastingNorthingService(),
+      new NZTopoService(),
       new GeoURIService(),
       new AppleMapsService(),
-      new NZTopoService(),
       new DegreesMinutesSecondsService(),
       new DecimalDegreesMinutesService(),
     ];
@@ -1941,7 +1947,23 @@ class TestRunner {
       expected: true
     })).map(t => this._run(t));
 
-    return [{ name: 'ServiceRegistry', tests: [...tests, ...ambiguityTests] }];
+    const nzOnlyServices = ['NZ Easting/Northing', 'NZ Topo50 Sheet'];
+    const nzOnlyTests = [
+      ...nzOnlyServices.map(name => ({
+        name: `${name}: nzOnly === true`,
+        run: () => this.registry.services.find(s => s.name === name)?.nzOnly,
+        expected: true
+      })),
+      ...this.registry.services
+        .filter(s => !nzOnlyServices.includes(s.name))
+        .map(s => ({
+          name: `${s.name}: nzOnly === false`,
+          run: () => s.nzOnly,
+          expected: false
+        })),
+    ].map(t => this._run(t));
+
+    return [{ name: 'ServiceRegistry', tests: [...tests, ...ambiguityTests, ...nzOnlyTests] }];
   }
 
   _run(test) {
@@ -2152,10 +2174,21 @@ class App {
   }
 
   _renderResult({ detectedService, coords, links }) {
-    const warning = isInNZ(coords.lat, coords.lng) ? '' :
-      `<div class="warning-box">⚠️ These coordinates are outside New Zealand — Topo50 Sheet and Easting/Northing results won't be meaningful.</div>`;
+    const inNZ = isInNZ(coords.lat, coords.lng);
+    const warning = inNZ ? '' :
+      `<div class="warning-box">⚠️ These coordinates are outside New Zealand.</div>`;
 
-    const linkRows = links.map(({ service, value }) => {
+    const visibleLinks = inNZ ? links : links.map(({ service, value }) =>
+      service.nzOnly ? { service, value: null } : { service, value }
+    );
+    const linkRows = visibleLinks.map(({ service, value }) => {
+      if (value === null) {
+        return `
+        <li class="result-item">
+          <span class="result-service">${escapeHtml(service.name)}</span>
+          <span class="result-value muted">Not available outside NZ</span>
+        </li>`;
+      }
       const display = service.isURL
         ? `<a href="${escapeHtml(value)}" target="_blank" rel="noopener">Open in ${escapeHtml(service.name)} ↗</a>`
         : escapeHtml(value);
