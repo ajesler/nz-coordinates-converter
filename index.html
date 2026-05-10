@@ -1900,6 +1900,115 @@ class DecimalDegreesMinutesService extends MapService {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// NZ Walking Access Commission – Outdoor Access Map
+// Format: https://maps.herengaanuku.govt.nz/Viewer/?map=<id>&marker=E%2CN%2C2193%2C%2C%2C&level=<zoom>
+// Marker uses NZTM2000 easting/northing (EPSG:2193)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class OutdoorAccessMapService extends MapService {
+  constructor() {
+    super();
+    this._proj = new NZTM2000();
+    this._defaultMap = '202d9deb4dfa4c82a13536e12c58d8fa';
+  }
+
+  get name()  { return 'OutdoorAccessMap'; }
+  get isURL() { return true; }
+  get nzOnly() { return true; }
+  exampleValue() { return 'https://maps.herengaanuku.govt.nz/Viewer/?map=202d9deb4dfa4c82a13536e12c58d8fa&marker=1883754.8736%2C5675358.0466%2C2193%2C%2C%2C&level=14'; }
+
+  canParse(input) {
+    return /https?:\/\/maps\.herengaanuku\.govt\.nz/i.test(input);
+  }
+
+  parse(input) {
+    // Decode marker=E,N,2193,,,  (commas may be %2C encoded)
+    const markerM = input.match(/[?&]marker=([^&]+)/i);
+    if (!markerM) return null;
+    const parts = decodeURIComponent(markerM[1]).split(',');
+    const E = parseFloat(parts[0]);
+    const N = parseFloat(parts[1]);
+    if (isNaN(E) || isNaN(N)) return null;
+
+    const levelM = input.match(/[?&]level=(\d+)/i);
+    const zoom = levelM ? parseInt(levelM[1], 10) : 14;
+
+    const { lat, lng } = this._proj.fromNZTM(E, N);
+    return new Coordinates(lat, lng, zoom);
+  }
+
+  generate(coords) {
+    if (!isInNZ(coords.lat, coords.lng)) return null;
+    const { E, N } = this._proj.toNZTM(coords.lat, coords.lng);
+    const level = coords.zoom ?? 14;
+    const marker = `${E.toFixed(4)}%2C${N.toFixed(4)}%2C2193%2C%2C%2C`;
+    return `https://maps.herengaanuku.govt.nz/Viewer/?map=${this._defaultMap}&marker=${marker}&level=${level}`;
+  }
+
+  getTests() {
+    const svc = new OutdoorAccessMapService();
+    return [
+      {
+        name: 'Detect OutdoorAccessMap URL',
+        run: () => svc.canParse('https://maps.herengaanuku.govt.nz/Viewer/?map=202d9deb4dfa4c82a13536e12c58d8fa&marker=1883754.8736%2C5675358.0466%2C2193%2C%2C%2C&level=14'),
+        expected: true
+      },
+      {
+        name: 'exampleValue() is recognised by canParse',
+        run: () => svc.canParse(svc.exampleValue()),
+        expected: true
+      },
+      {
+        name: 'Parse extracts lat/lng from NZTM marker',
+        run: () => {
+          const c = svc.parse('https://maps.herengaanuku.govt.nz/Viewer/?map=202d9deb4dfa4c82a13536e12c58d8fa&marker=1883754.8736%2C5675358.0466%2C2193%2C%2C%2C&level=14');
+          return c !== null && c.lat > -48 && c.lat < -34 && c.lng > 165 && c.lng < 179;
+        },
+        expected: true
+      },
+      {
+        name: 'Parse extracts zoom from level param',
+        run: () => {
+          const c = svc.parse('https://maps.herengaanuku.govt.nz/Viewer/?map=202d9deb4dfa4c82a13536e12c58d8fa&marker=1883754.8736%2C5675358.0466%2C2193%2C%2C%2C&level=14');
+          return c !== null && c.zoom === 14;
+        },
+        expected: true
+      },
+      {
+        name: 'Generate produces a herengaanuku URL',
+        run: () => {
+          const url = svc.generate(new Coordinates(-41.2865, 174.7762, 15));
+          return url !== null && url.startsWith('https://maps.herengaanuku.govt.nz/');
+        },
+        expected: true
+      },
+      {
+        name: 'Generate includes EPSG:2193 in marker',
+        run: () => {
+          const url = svc.generate(new Coordinates(-41.2865, 174.7762, 15));
+          return url !== null && url.includes('2193');
+        },
+        expected: true
+      },
+      {
+        name: 'Round-trip Wellington within 0.001°',
+        run: () => {
+          const orig = new Coordinates(-41.2865, 174.7762, 14);
+          const back = svc.parse(svc.generate(orig));
+          return back !== null && nearEqual(back.lat, orig.lat, 1e-3) && nearEqual(back.lng, orig.lng, 1e-3);
+        },
+        expected: true
+      },
+      {
+        name: 'Generate returns null outside NZ',
+        run: () => svc.generate(new Coordinates(51.5, -0.1)) === null,
+        expected: true
+      }
+    ];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Service Registry — owns the ordered list of all services
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1917,6 +2026,7 @@ class ServiceRegistry {
       new OpenStreetMapService(),
       new DegreesMinutesSecondsService(),
       new DecimalDegreesMinutesService(),
+      new OutdoorAccessMapService(),
     ];
   }
 
