@@ -939,7 +939,7 @@ class NZTopoService extends MapService {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class LINZBasemapsService extends MapService {
-  get name()  { return 'LINZ Basemaps (Satellite Imagery)'; }
+  get name()  { return 'LINZ Basemaps'; }
   get isURL() { return true; }
   exampleValue() { return 'https://basemaps.linz.govt.nz/@-41.1106263,175.0948097,z19.34'; }
 
@@ -1200,6 +1200,7 @@ class NZTMEastingNorthingService extends MapService {
   }
 
   generate(coords) {
+    if (!isInNZ(coords.lat, coords.lng)) return null;
     const { E, N } = this._proj.toNZTM(coords.lat, coords.lng);
     return `E ${E} N ${N}`;
   }
@@ -1357,6 +1358,7 @@ class NZTopoSheetService extends MapService {
   }
 
   generate(coords) {
+    if (!isInNZ(coords.lat, coords.lng)) return null;
     const { E, N } = this._proj.toNZTM(coords.lat, coords.lng);
     const code = MapSheet.sheetCode(E, N);
     const refE = String(Math.round(E / 100) % 1000).padStart(3, '0');
@@ -2259,10 +2261,7 @@ class App {
     const warning = inNZ ? '' :
       `<div class="warning-box">⚠️ These coordinates are outside New Zealand.</div>`;
 
-    const visibleLinks = inNZ ? links : links.map(({ service, value }) =>
-      service.nzOnly ? { service, value: null } : { service, value }
-    );
-    const linkRows = visibleLinks.map(({ service, value }) => {
+    const linkRows = links.map(({ service, value }) => {
       if (value === null) {
         return `
         <li class="result-item">
