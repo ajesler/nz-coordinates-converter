@@ -1930,17 +1930,14 @@ class OutdoorAccessMapService extends MapService {
     const N = parseFloat(parts[1]);
     if (isNaN(E) || isNaN(N)) return null;
 
-    const levelM = input.match(/[?&]level=(\d+)/i);
-    const zoom = levelM ? parseInt(levelM[1], 10) : 14;
-
     const { lat, lng } = this._proj.fromNZTM(E, N);
-    return new Coordinates(lat, lng, zoom);
+    return new Coordinates(lat, lng, 16);
   }
 
   generate(coords) {
     if (!isInNZ(coords.lat, coords.lng)) return null;
     const { E, N } = this._proj.toNZTM(coords.lat, coords.lng);
-    const level = coords.zoom ?? 14;
+    const level = 16;
     const marker = `${E.toFixed(4)}%2C${N.toFixed(4)}%2C2193%2C%2C%2C`;
     return `https://maps.herengaanuku.govt.nz/Viewer/?map=${this._defaultMap}&marker=${marker}&level=${level}`;
   }
@@ -1967,17 +1964,17 @@ class OutdoorAccessMapService extends MapService {
         expected: true
       },
       {
-        name: 'Parse extracts zoom from level param',
+        name: 'Parse always returns zoom 16',
         run: () => {
           const c = svc.parse('https://maps.herengaanuku.govt.nz/Viewer/?map=202d9deb4dfa4c82a13536e12c58d8fa&marker=1883754.8736%2C5675358.0466%2C2193%2C%2C%2C&level=14');
-          return c !== null && c.zoom === 14;
+          return c !== null && c.zoom === 16;
         },
         expected: true
       },
       {
         name: 'Generate produces a herengaanuku URL',
         run: () => {
-          const url = svc.generate(new Coordinates(-41.2865, 174.7762, 15));
+          const url = svc.generate(new Coordinates(-41.2865, 174.7762));
           return url !== null && url.startsWith('https://maps.herengaanuku.govt.nz/');
         },
         expected: true
@@ -1985,15 +1982,23 @@ class OutdoorAccessMapService extends MapService {
       {
         name: 'Generate includes EPSG:2193 in marker',
         run: () => {
-          const url = svc.generate(new Coordinates(-41.2865, 174.7762, 15));
+          const url = svc.generate(new Coordinates(-41.2865, 174.7762));
           return url !== null && url.includes('2193');
+        },
+        expected: true
+      },
+      {
+        name: 'Generate always uses level=16',
+        run: () => {
+          const url = svc.generate(new Coordinates(-41.2865, 174.7762));
+          return url !== null && url.includes('level=16');
         },
         expected: true
       },
       {
         name: 'Round-trip Wellington within 0.001°',
         run: () => {
-          const orig = new Coordinates(-41.2865, 174.7762, 14);
+          const orig = new Coordinates(-41.2865, 174.7762);
           const back = svc.parse(svc.generate(orig));
           return back !== null && nearEqual(back.lat, orig.lat, 1e-3) && nearEqual(back.lng, orig.lng, 1e-3);
         },
