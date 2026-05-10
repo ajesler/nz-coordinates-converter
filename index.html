@@ -1008,16 +1008,16 @@ class NZEastingNorthingService extends MapService {
 
   canParse(input) {
     const t = input.trim();
-    return /^E\s*\d{6,8}\s+N\s*\d{6,8}$/i.test(t) ||
-           /^\d{6,8}\s*E\s+\d{6,8}\s*N$/i.test(t);
+    return /^E\s*\d{6,8}[\s,]+N\s*\d{6,8}$/i.test(t) ||
+           /^\d{6,8}\s*E[\s,]+\d{6,8}\s*N$/i.test(t);
   }
 
   parse(input) {
     const t = input.trim();
     // "E 1845100 N 5743800" style
-    let m = t.match(/^E\s*(\d+)\s+N\s*(\d+)$/i);
+    let m = t.match(/^E\s*(\d+)[\s,]+N\s*(\d+)$/i);
     // "1845100E 5743800N" style
-    if (!m) m = t.match(/^(\d+)\s*E\s+(\d+)\s*N$/i);
+    if (!m) m = t.match(/^(\d+)\s*E[\s,]+(\d+)\s*N$/i);
     if (!m) return null;
     const { lat, lng } = this._proj.fromNZTM(parseInt(m[1]), parseInt(m[2]));
     return new Coordinates(lat, lng);
@@ -1037,8 +1037,18 @@ class NZEastingNorthingService extends MapService {
         expected: true
       },
       {
+        name: 'Detect E/N format with comma separator',
+        run: () => svc.canParse('E 1845100, N 5743800'),
+        expected: true
+      },
+      {
         name: 'Detect 1234567E 7654321N format',
         run: () => svc.canParse('1758997E 5448611N'),
+        expected: true
+      },
+      {
+        name: 'Detect 1234567E, 7654321N format with comma',
+        run: () => svc.canParse('1758997E, 5448611N'),
         expected: true
       },
       {
@@ -1056,6 +1066,15 @@ class NZEastingNorthingService extends MapService {
         run: () => {
           const a = svc.parse('E 1758997 N 5448611');
           const b = svc.parse('1758997E 5448611N');
+          return nearEqual(a.lat, b.lat) && nearEqual(a.lng, b.lng);
+        },
+        expected: true
+      },
+      {
+        name: 'Parse with comma matches parse without comma',
+        run: () => {
+          const a = svc.parse('E 1758997 N 5448611');
+          const b = svc.parse('E 1758997, N 5448611');
           return nearEqual(a.lat, b.lat) && nearEqual(a.lng, b.lng);
         },
         expected: true
