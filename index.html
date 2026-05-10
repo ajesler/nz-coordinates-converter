@@ -315,7 +315,8 @@ function nearEqual(a, b, tol = 1e-6) {
 // Bounding box covering NZ mainland, Stewart Island, and nearby coastal islands.
 // Excludes distant territories (Chatham, Kermadec, Subantarctic).
 function isInNZ(lat, lng) {
-  return lat >= -47.5 && lat <= -34.0 && lng >= 165.5 && lng <= 178.6;
+  // Bounds align with EPSG:2193 (NZTM2000) official extent
+  return lat >= -47.33 && lat <= -34.10 && lng >= 166.37 && lng <= 178.63;
 }
 
 function escapeHtml(str) {
@@ -1921,14 +1922,14 @@ class TestRunner {
       { name: 'Auckland is in NZ',           run: () => isInNZ(-36.8485, 174.7633), expected: true  },
       { name: 'London is not in NZ',         run: () => isInNZ(51.5074, -0.1278),   expected: false },
       { name: 'Sydney is not in NZ',         run: () => isInNZ(-33.8688, 151.2093), expected: false },
-      { name: 'South boundary (-47.5) in',   run: () => isInNZ(-47.5, 172.0),       expected: true  },
-      { name: 'North boundary (-34.0) in',   run: () => isInNZ(-34.0, 172.0),       expected: true  },
-      { name: 'West boundary (165.5) in',    run: () => isInNZ(-41.0, 165.5),       expected: true  },
-      { name: 'East boundary (178.6) in',    run: () => isInNZ(-41.0, 178.6),       expected: true  },
-      { name: 'Just south of NZ (-47.51)',   run: () => isInNZ(-47.51, 172.0),      expected: false },
-      { name: 'Just north of NZ (-33.99)',   run: () => isInNZ(-33.99, 172.0),      expected: false },
-      { name: 'Just west of NZ (165.49)',    run: () => isInNZ(-41.0, 165.49),      expected: false },
-      { name: 'Just east of NZ (178.61)',    run: () => isInNZ(-41.0, 178.61),      expected: false },
+      { name: 'South boundary (-47.33) in',  run: () => isInNZ(-47.33, 172.0),      expected: true  },
+      { name: 'North boundary (-34.10) in',  run: () => isInNZ(-34.10, 172.0),      expected: true  },
+      { name: 'West boundary (166.37) in',   run: () => isInNZ(-41.0, 166.37),      expected: true  },
+      { name: 'East boundary (178.63) in',   run: () => isInNZ(-41.0, 178.63),      expected: true  },
+      { name: 'Just south of NZ (-47.34)',   run: () => isInNZ(-47.34, 172.0),      expected: false },
+      { name: 'Just north of NZ (-34.09)',   run: () => isInNZ(-34.09, 172.0),      expected: false },
+      { name: 'Just west of NZ (166.36)',    run: () => isInNZ(-41.0, 166.36),      expected: false },
+      { name: 'Just east of NZ (178.64)',    run: () => isInNZ(-41.0, 178.64),      expected: false },
     ].map(t => this._run(t));
     return [{ name: 'isInNZ', tests }];
   }
