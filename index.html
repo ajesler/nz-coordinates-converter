@@ -785,13 +785,13 @@ class AppleMapsService extends MapService {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // OpenStreetMap
-// Format: https://www.openstreetmap.org/#map=15/-41.2865/174.7762
+// Format: https://www.openstreetmap.org/?mlat=-41.2865&mlon=174.7762
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class OpenStreetMapService extends MapService {
   get name()  { return 'OpenStreetMap'; }
   get isURL() { return true; }
-  exampleValue() { return 'https://www.openstreetmap.org/#map=15/-41.2865/174.7762'; }
+  exampleValue() { return 'https://www.openstreetmap.org/?mlat=-41.2865&mlon=174.7762'; }
 
   canParse(input) {
     return /openstreetmap\.org/i.test(input);
@@ -809,8 +809,7 @@ class OpenStreetMapService extends MapService {
   }
 
   generate(coords) {
-    const z = Math.round(coords.zoom ?? 15);
-    return `https://www.openstreetmap.org/#map=${z}/${coords.lat}/${coords.lng}`;
+    return `https://www.openstreetmap.org/?mlat=${coords.lat}&mlon=${coords.lng}`;
   }
 
   getTests() {
