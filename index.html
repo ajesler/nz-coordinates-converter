@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="NZ Map Converter">
-  <!-- Manifest injected via JS below as a data URI (keeps single-file) -->
+  <link rel="manifest" href="manifest.json">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1866,95 +1866,13 @@ function copyToClipboard(text) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Web App Manifest — injected as a data: URI to stay single-file
 // ═══════════════════════════════════════════════════════════════════════════════
-
-(function injectManifest() {
-  const manifest = {
-    name: 'NZ Map Coordinate Converter',
-    short_name: 'NZ Map Conv.',
-    description: 'Convert between NZ map coordinate formats offline.',
-    start_url: './',
-    display: 'standalone',
-    background_color: '#f1f5f9',
-    theme_color: '#2563eb',
-    icons: [
-      {
-        // Simple SVG map-pin icon encoded inline — no external asset needed
-        src: 'data:image/svg+xml,' + encodeURIComponent(
-          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
-          + '<rect width="512" height="512" rx="96" fill="#2563eb"/>'
-          + '<text x="256" y="360" font-size="320" text-anchor="middle" fill="white">🗺</text>'
-          + '</svg>'
-        ),
-        sizes: 'any',
-        type: 'image/svg+xml',
-        purpose: 'any maskable'
-      }
-    ]
-  };
-  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-  const link = document.createElement('link');
-  link.rel  = 'manifest';
-  link.href = URL.createObjectURL(blob);
-  document.head.appendChild(link);
-})();
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Service Worker — registered from a Blob URL so no separate sw.js file needed.
-// Caches this page after first load; subsequent visits work fully offline.
-// Only active when the page is served over HTTP(S) (not file://).
+// Service Worker — registers sw.js for offline support over HTTP(S).
 // ═══════════════════════════════════════════════════════════════════════════════
 
 (function registerServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
-
-  const CACHE = 'nz-map-conv-v2';
-
-  const swCode = `
-const CACHE = '${CACHE}';
-
-self.addEventListener('install', event => {
-  // Cache the page itself on first install
-  event.waitUntil(
-    caches.open(CACHE).then(cache => cache.add(self.location.origin + self.registration.scope.replace(self.location.origin, '')))
-      .catch(() => {}) // best-effort; don't block install
-      .then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('activate', event => {
-  // Remove stale caches from previous versions
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', event => {
-  // Cache-first strategy: serve from cache, fall back to network and update cache
-  if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.open(CACHE).then(cache =>
-      cache.match(event.request).then(cached => {
-        const fetchPromise = fetch(event.request).then(response => {
-          if (response && response.status === 200) {
-            cache.put(event.request, response.clone());
-          }
-          return response;
-        }).catch(() => cached); // network failed — return cached copy
-        return cached || fetchPromise;
-      })
-    )
-  );
-});
-`;
-
-  const swBlob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl  = URL.createObjectURL(swBlob);
-
-  navigator.serviceWorker.register(swUrl)
+  navigator.serviceWorker.register('./sw.js')
     .catch(err => console.warn('Service Worker registration failed:', err));
 })();
 
