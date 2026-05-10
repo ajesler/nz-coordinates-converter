@@ -153,16 +153,15 @@
 
     /* ── Results ── */
     .detected-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: .375rem;
-      background: var(--green-bg);
+      display: block;
       color: var(--green-text);
-      padding: .25rem .75rem;
-      border-radius: 9999px;
       font-size: .875rem;
-      font-weight: 500;
-      margin-bottom: .625rem;
+      font-weight: 600;
+      margin-bottom: .75rem;
+    }
+    .detected-badge .detected-label {
+      font-weight: 400;
+      opacity: .75;
     }
 
     .result-list { list-style: none; }
@@ -2130,7 +2129,7 @@ class App {
     }).join('');
 
     return `
-      <div class="detected-badge">${escapeHtml(detectedService.name)}</div>
+      <div class="detected-badge"><span class="detected-label">Detected:</span> ${escapeHtml(detectedService.name)}</div>
       ${warning}
       <ul class="result-list">${linkRows}</ul>
     `;
@@ -2142,7 +2141,7 @@ class App {
     ).join('');
     return `
       <div class="error-box">
-        <p>Could not identify the format of <strong>${escapeHtml(input.substring(0, 80))}${input.length > 80 ? '…' : ''}</strong>.</p>
+        <p>Could not identify the format of <strong style="word-break:break-all">${escapeHtml(input.substring(0, 80))}${input.length > 80 ? '…' : ''}</strong>.</p>
         <p style="margin-top:.625rem;margin-bottom:.375rem">Supported formats:</p>
         <ul style="list-style:none;display:flex;flex-direction:column;gap:.25rem">${rows}</ul>
       </div>`;
